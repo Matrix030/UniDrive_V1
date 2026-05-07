@@ -97,7 +97,31 @@ Run the automated smoke test before a manual demo:
 ./scripts/smoke-test.sh
 ```
 
-The smoke test installs fresh module artifacts, runs selected client workspace/session/sync checks, starts an isolated server on port `18080`, and verifies login, assignment, submission, feedback, download, delete, and expected error flows. Use `UNIDRIVE_SMOKE_PORT=18081 ./scripts/smoke-test.sh` if port `18080` is busy.
+If port `18080` is busy, run it on another port:
+
+```bash
+UNIDRIVE_SMOKE_PORT=18081 ./scripts/smoke-test.sh
+```
+
+The smoke test installs fresh module artifacts, runs selected client workspace/session/sync checks, starts an isolated Spring Boot server, writes all temporary files under `target/smoke/`, and stops the server automatically when finished.
+
+It verifies:
+
+- student and instructor mock login success
+- login errors for wrong password, unknown email, blank email, and blank password
+- assignment publish, list, download, delete, and missing-assignment errors
+- submission upload, list, filtered list, download, delete, SHA-256 mismatch, and missing-submission errors
+- feedback upload, list, download, missing-submission, and missing-feedback errors
+- downloaded assignment, submission, and feedback contents match the uploaded files
+- selected client workspace, session, dashboard snapshot, and sync-service tests still pass
+
+Useful options:
+
+```bash
+UNIDRIVE_SMOKE_SKIP_BUILD=1 ./scripts/smoke-test.sh          # reuse existing build artifacts
+UNIDRIVE_SMOKE_CLEAN_BUILD=1 ./scripts/smoke-test.sh         # force clean install first
+UNIDRIVE_SMOKE_SKIP_CLIENT_TESTS=1 ./scripts/smoke-test.sh   # only run server/API smoke checks
+```
 
 ## Key API Endpoints
 
