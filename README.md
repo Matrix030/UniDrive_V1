@@ -6,7 +6,7 @@ This README is the final project report. It includes setup instructions, demo cr
 
 ## API Key Requirement
 
-No external API key is required for this project. Authentication is implemented as a mocked SSO-style login module for the course project, so the first screen asks for an email and password instead of an API key.
+No external API key is required for this project. Authentication is implemented as a mocked SSO-style login module for the course project, so the first screen asks for an email and password instead of an API key. Demo passwords are verified against salted PBKDF2-SHA256 hashes, and the server stores only `password_hash` values in SQLite.
 
 Use one of these demo accounts. Every account uses password `password123`.
 
@@ -34,7 +34,7 @@ The project is split into a JavaFX desktop client and a Spring Boot REST server.
 
 ### 2. Persistent storage with SQLite
 
-The server stores users, assignments, submissions, and feedback metadata in SQLite. The client also uses local SQLite databases for sync state and received-file tracking, so it can restore dashboard status across app launches.
+The server stores users, salted password hashes, assignments, submissions, and feedback metadata in SQLite. The client also uses local SQLite databases for sync state and received-file tracking, so it can restore dashboard status across app launches.
 
 ### 3. Background file synchronization
 

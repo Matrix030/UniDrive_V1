@@ -47,6 +47,11 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.data.email").value("rvg9395@nyu.edu"))
             .andExpect(jsonPath("$.data.role").value("STUDENT"))
             .andExpect(jsonPath("$.data.accessToken").value("mock-sso-token-rvg9395"));
+
+        String passwordHash = jdbcTemplate.queryForObject(
+            "SELECT password_hash FROM users WHERE id = ?", String.class, "rvg9395");
+        org.junit.jupiter.api.Assertions.assertNotEquals("password123", passwordHash);
+        org.junit.jupiter.api.Assertions.assertTrue(passwordHash.startsWith("pbkdf2_sha256$"));
     }
 
     @Test
@@ -63,6 +68,9 @@ class AuthControllerTest {
         String role = jdbcTemplate.queryForObject(
             "SELECT role FROM users WHERE id = ?", String.class, "instructor_rvg0000");
         org.junit.jupiter.api.Assertions.assertEquals("INSTRUCTOR", role);
+        String passwordHash = jdbcTemplate.queryForObject(
+            "SELECT password_hash FROM users WHERE id = ?", String.class, "instructor_rvg0000");
+        org.junit.jupiter.api.Assertions.assertTrue(passwordHash.startsWith("pbkdf2_sha256$"));
     }
 
     @Test
@@ -77,6 +85,9 @@ class AuthControllerTest {
         String role = jdbcTemplate.queryForObject(
             "SELECT role FROM users WHERE id = ?", String.class, "instructor_rvg0000");
         org.junit.jupiter.api.Assertions.assertEquals("INSTRUCTOR", role);
+        String passwordHash = jdbcTemplate.queryForObject(
+            "SELECT password_hash FROM users WHERE id = ?", String.class, "instructor_rvg0000");
+        org.junit.jupiter.api.Assertions.assertTrue(passwordHash.startsWith("pbkdf2_sha256$"));
     }
 
     @Test

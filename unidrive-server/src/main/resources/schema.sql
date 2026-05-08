@@ -1,7 +1,8 @@
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     name TEXT,
-    role TEXT
+    role TEXT,
+    password_hash TEXT
 );
 
 CREATE TABLE IF NOT EXISTS assignments (

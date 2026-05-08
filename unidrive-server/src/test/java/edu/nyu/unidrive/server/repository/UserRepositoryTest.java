@@ -35,7 +35,8 @@ class UserRepositoryTest {
 
     @Test
     void saveAndFindByIdRoundTripsUserRecord() {
-        userRepository.save("rvg9395", "Rishikesh", "STUDENT");
+        String passwordHash = "pbkdf2_sha256$120000$salt$hash";
+        userRepository.save("rvg9395", "Rishikesh", "STUDENT", passwordHash);
 
         Optional<UserRepository.StoredUser> found = userRepository.findById("rvg9395");
 
@@ -43,5 +44,6 @@ class UserRepositoryTest {
         assertEquals("rvg9395", found.get().id());
         assertEquals("Rishikesh", found.get().name());
         assertEquals("STUDENT", found.get().role());
+        assertEquals(passwordHash, found.get().passwordHash());
     }
 }

@@ -42,9 +42,19 @@ public class AuthController {
         }
 
         if (userRepository.findById(authenticatedUser.userId()).isEmpty()) {
-            userRepository.save(authenticatedUser.userId(), authenticatedUser.name(), authenticatedUser.role());
+            userRepository.save(
+                authenticatedUser.userId(),
+                authenticatedUser.name(),
+                authenticatedUser.role(),
+                authenticatedUser.passwordHash()
+            );
         } else {
-            userRepository.updateRole(authenticatedUser.userId(), authenticatedUser.role());
+            userRepository.updateProfile(
+                authenticatedUser.userId(),
+                authenticatedUser.name(),
+                authenticatedUser.role(),
+                authenticatedUser.passwordHash()
+            );
         }
         UserRepository.StoredUser user = userRepository.findById(authenticatedUser.userId()).orElseThrow();
 
