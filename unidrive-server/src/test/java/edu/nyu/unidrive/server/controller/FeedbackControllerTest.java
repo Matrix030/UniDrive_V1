@@ -3,6 +3,7 @@ package edu.nyu.unidrive.server.controller;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -75,10 +76,11 @@ class FeedbackControllerTest {
             .andExpect(jsonPath("$.data.sha256").value(sha256));
 
         Map<String, Object> saved = jdbcTemplate.queryForMap(
-            "SELECT submission_id, hash FROM feedback WHERE submission_id = ?",
+            "SELECT submission_id, file_name, hash FROM feedback WHERE submission_id = ?",
             submissionId
         );
         org.junit.jupiter.api.Assertions.assertEquals(submissionId, saved.get("submission_id"));
+        org.junit.jupiter.api.Assertions.assertEquals("Feedback.txt", saved.get("file_name"));
         org.junit.jupiter.api.Assertions.assertEquals(sha256, saved.get("hash"));
 
         try (Stream<Path> storedFiles = Files.walk(STORAGE_ROOT)) {
@@ -105,6 +107,37 @@ class FeedbackControllerTest {
     }
 
     @Test
+    void uploadingSameFeedbackFileReplacesExistingRow() throws Exception {
+        String submissionId = createSubmission("assignment-1", "rvg9395", "Solution.java", "class Solution {}".getBytes());
+        uploadFeedback(submissionId, "Feedback.txt", "first".getBytes());
+        String feedbackId = jdbcTemplate.queryForObject(
+            "SELECT id FROM feedback WHERE submission_id = ?",
+            String.class,
+            submissionId
+        );
+
+        uploadFeedback(submissionId, "Feedback.txt", "second".getBytes());
+
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM feedback WHERE submission_id = ? AND file_name = ?",
+            Integer.class,
+            submissionId,
+            "Feedback.txt"
+        );
+        org.junit.jupiter.api.Assertions.assertEquals(1, count);
+        org.junit.jupiter.api.Assertions.assertEquals(feedbackId, jdbcTemplate.queryForObject(
+            "SELECT id FROM feedback WHERE submission_id = ? AND file_name = ?",
+            String.class,
+            submissionId,
+            "Feedback.txt"
+        ));
+
+        mockMvc.perform(get("/api/v1/feedback/{feedbackId}/download", feedbackId))
+            .andExpect(status().isOk())
+            .andExpect(content().bytes("second".getBytes()));
+    }
+
+    @Test
     void downloadFeedbackReturnsStoredFileContents() throws Exception {
         String submissionId = createSubmission("assignment-1", "rvg9395", "Solution.java", "class Solution {}".getBytes());
         byte[] content = "feedback comments".getBytes();
@@ -119,6 +152,30 @@ class FeedbackControllerTest {
             .andExpect(status().isOk())
             .andExpect(header().string("Content-Disposition", startsWith("attachment; filename=\"Feedback.txt\"")))
             .andExpect(content().bytes(content));
+    }
+
+    @Test
+    void deleteFeedbackRemovesMetadataAndFile() throws Exception {
+        String submissionId = createSubmission("assignment-1", "rvg9395", "Solution.java", "class Solution {}".getBytes());
+        uploadFeedback(submissionId, "Feedback.txt", "feedback comments".getBytes());
+        String feedbackId = jdbcTemplate.queryForObject(
+            "SELECT id FROM feedback WHERE submission_id = ?",
+            String.class,
+            submissionId
+        );
+        String storedPath = jdbcTemplate.queryForObject(
+            "SELECT file_path FROM feedback WHERE id = ?",
+            String.class,
+            feedbackId
+        );
+
+        mockMvc.perform(delete("/api/v1/feedback/{feedbackId}", feedbackId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("ok"));
+
+        Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM feedback WHERE id = ?", Integer.class, feedbackId);
+        org.junit.jupiter.api.Assertions.assertEquals(0, count);
+        org.junit.jupiter.api.Assertions.assertFalse(Files.exists(Path.of(storedPath)));
     }
 
     private String createSubmission(String assignmentId, String studentId, String fileName, byte[] content) throws Exception {

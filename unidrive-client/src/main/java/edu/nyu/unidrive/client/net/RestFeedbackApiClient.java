@@ -87,6 +87,11 @@ public final class RestFeedbackApiClient implements FeedbackApiClient {
         );
     }
 
+    @Override
+    public void deleteFeedback(String feedbackId) {
+        restTemplate.delete(baseUrl + "/api/v1/feedback/" + feedbackId);
+    }
+
     private static final class NamedByteArrayResource extends ByteArrayResource {
         private final String filename;
 

@@ -5,12 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import edu.nyu.unidrive.client.net.AssignmentApiClient;
 import edu.nyu.unidrive.client.net.DownloadedFile;
+import edu.nyu.unidrive.client.net.FeedbackApiClient;
 import edu.nyu.unidrive.client.net.SubmissionApiClient;
 import edu.nyu.unidrive.client.storage.AssignmentSlot;
 import edu.nyu.unidrive.client.storage.ReceivedStateRepository;
 import edu.nyu.unidrive.client.storage.SyncStateRepository;
 import edu.nyu.unidrive.client.storage.WorkspaceLayout;
 import edu.nyu.unidrive.common.dto.AssignmentSummaryResponse;
+import edu.nyu.unidrive.common.dto.FeedbackSummaryResponse;
 import edu.nyu.unidrive.common.dto.SubmissionSummaryResponse;
 import edu.nyu.unidrive.common.dto.SubmissionUploadResponse;
 import edu.nyu.unidrive.common.model.SyncStatus;
@@ -81,6 +83,25 @@ class CurrentFolderWorkflowIntegrationTest {
         ).processOnce();
 
         Path instructorCopy = instructorRoot.resolve("fall2026/daa/hashing/submissions/student_rvg9395/Solution.java");
+        Path instructorFeedback = instructorRoot.resolve("fall2026/daa/hashing/submissions/student_rvg9395/feedback/comments.txt");
+        Files.writeString(instructorFeedback, "Good work. Add tests next time.");
+        FeedbackDirectoryWatcher feedbackWatcher = new FeedbackDirectoryWatcher(instructorRoot);
+        try {
+            new InstructorFeedbackSyncService(
+                feedbackWatcher,
+                new FeedbackUploadService(instructorSyncRepository, server, server, instructorRoot),
+                new FeedbackReconcileService(instructorSyncRepository),
+                instructorSyncRepository,
+                instructorRoot,
+                Duration.ZERO
+            ).processOnce();
+        } finally {
+            feedbackWatcher.close();
+        }
+
+        Path studentFeedback = studentRoot.resolve("fall2026/daa/hashing/feedback/comments.txt");
+        new FeedbackSyncService(server, studentReceivedRepository).syncFeedback("rvg9395", studentRoot);
+
         assertEquals(1, downloadedAssignments);
         assertTrue(Files.exists(studentSpec));
         assertEquals("Implement a hash table.", Files.readString(studentSpec));
@@ -89,13 +110,34 @@ class CurrentFolderWorkflowIntegrationTest {
         assertTrue(Files.exists(instructorCopy));
         assertEquals("class Solution {}", Files.readString(instructorCopy));
         assertEquals(SyncStatus.SYNCED, instructorReceivedRepository.findByLocalPath(instructorCopy).orElseThrow().status());
+        assertTrue(Files.exists(studentFeedback));
+        assertEquals("Good work. Add tests next time.", Files.readString(studentFeedback));
+
+        Files.delete(instructorFeedback);
+        FeedbackDirectoryWatcher deleteFeedbackWatcher = new FeedbackDirectoryWatcher(instructorRoot);
+        try {
+            new InstructorFeedbackSyncService(
+                deleteFeedbackWatcher,
+                new FeedbackUploadService(instructorSyncRepository, server, server, instructorRoot),
+                new FeedbackReconcileService(instructorSyncRepository),
+                instructorSyncRepository,
+                instructorRoot,
+                Duration.ZERO
+            ).processOnce();
+        } finally {
+            deleteFeedbackWatcher.close();
+        }
+        new FeedbackSyncService(server, studentReceivedRepository).syncFeedback("rvg9395", studentRoot);
+        assertTrue(Files.notExists(studentFeedback));
     }
 
-    private static final class CurrentFolderServer implements AssignmentApiClient, SubmissionApiClient {
+    private static final class CurrentFolderServer implements AssignmentApiClient, SubmissionApiClient, FeedbackApiClient {
 
         private final Map<String, StoredAssignment> assignments = new LinkedHashMap<>();
         private final Map<String, StoredSubmission> submissions = new LinkedHashMap<>();
+        private final Map<String, StoredFeedback> feedbackRows = new LinkedHashMap<>();
         private int nextSubmissionId = 1;
+        private int nextFeedbackId = 1;
 
         @Override
         public List<AssignmentSummaryResponse> listAssignments(String term, String courseSlug) {
@@ -191,10 +233,61 @@ class CurrentFolderWorkflowIntegrationTest {
             submissions.remove(submissionId);
         }
 
+        @Override
+        public List<FeedbackSummaryResponse> listFeedback(String studentId) {
+            List<FeedbackSummaryResponse> feedback = new ArrayList<>();
+            for (StoredFeedback storedFeedback : feedbackRows.values()) {
+                SubmissionSummaryResponse submission = submissions.get(storedFeedback.submissionId).summary;
+                if (studentId.equals(submission.getStudentId())) {
+                    feedback.add(storedFeedback.summary);
+                }
+            }
+            return feedback;
+        }
+
+        @Override
+        public DownloadedFile downloadFeedback(String feedbackId) {
+            StoredFeedback feedback = feedbackRows.values().stream()
+                .filter(row -> row.summary.getFeedbackId().equals(feedbackId))
+                .findFirst()
+                .orElseThrow();
+            return new DownloadedFile(feedback.summary.getFileName(), feedback.content);
+        }
+
+        @Override
+        public FeedbackSummaryResponse uploadFeedback(String submissionId, Path file) throws IOException {
+            StoredSubmission submission = submissions.get(submissionId);
+            byte[] content = Files.readAllBytes(file);
+            String fileName = file.getFileName().toString();
+            String key = submissionId + "/" + fileName;
+            StoredFeedback existing = feedbackRows.get(key);
+            String feedbackId = existing == null ? "feedback-" + nextFeedbackId++ : existing.summary.getFeedbackId();
+            FeedbackSummaryResponse summary = new FeedbackSummaryResponse(
+                feedbackId,
+                submissionId,
+                submission.summary.getTerm(),
+                submission.summary.getCourse(),
+                submission.summary.getAssignmentId(),
+                submission.summary.getStudentId(),
+                fileName,
+                FileHasher.sha256Hex(content)
+            );
+            feedbackRows.put(key, new StoredFeedback(submissionId, summary, content));
+            return summary;
+        }
+
+        @Override
+        public void deleteFeedback(String feedbackId) {
+            feedbackRows.entrySet().removeIf(entry -> entry.getValue().summary.getFeedbackId().equals(feedbackId));
+        }
+
         private record StoredAssignment(CoursePath coursePath, AssignmentSummaryResponse summary, byte[] content) {
         }
 
         private record StoredSubmission(SubmissionSummaryResponse summary, byte[] content) {
+        }
+
+        private record StoredFeedback(String submissionId, FeedbackSummaryResponse summary, byte[] content) {
         }
     }
 }

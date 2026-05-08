@@ -90,6 +90,15 @@ class CoursePathTest {
     }
 
     @Test
+    void parseRecognizesInstructorFeedbackUnderStudentSubmissionFolder() {
+        Path file = ROOT.resolve("fall2026/daa/hw1/submissions/student_rvg9395/feedback/comments.txt");
+        ParsedLocation parsed = CoursePath.parseFromWorkspace(ROOT, file).orElseThrow();
+        assertEquals(Leaf.FEEDBACK, parsed.leaf());
+        assertEquals(Optional.of("rvg9395"), parsed.studentId());
+        assertEquals(Path.of("comments.txt"), parsed.relativeFile());
+    }
+
+    @Test
     void parseReturnsEmptyForFilesOutsideWorkspace() {
         Path file = Path.of("/tmp/elsewhere/foo.txt").toAbsolutePath();
         assertTrue(CoursePath.parseFromWorkspace(ROOT, file).isEmpty());

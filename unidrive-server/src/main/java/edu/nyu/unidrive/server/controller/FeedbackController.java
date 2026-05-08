@@ -8,6 +8,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,6 +51,16 @@ public class FeedbackController {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + download.fileName() + "\"")
                 .body(new ByteArrayResource(download.content()));
+        } catch (FeedbackService.FeedbackNotFoundException exception) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @DeleteMapping("/api/v1/feedback/{feedbackId}")
+    public ResponseEntity<ApiResponse<Void>> deleteFeedback(@PathVariable("feedbackId") String feedbackId) throws Exception {
+        try {
+            feedbackService.deleteFeedback(feedbackId);
+            return ResponseEntity.ok(ApiResponse.ok(null, "Feedback deleted successfully."));
         } catch (FeedbackService.FeedbackNotFoundException exception) {
             return ResponseEntity.notFound().build();
         }

@@ -91,7 +91,16 @@ public record CoursePath(String term, String courseSlug, String assignmentId) {
                     return Optional.empty();
                 }
                 studentId = Optional.of(fourth.substring(STUDENT_PREFIX.length()));
-                file = relative.subpath(5, depth);
+                String fifth = relative.getName(5).toString();
+                if (FEEDBACK_DIR.equals(fifth)) {
+                    if (depth < 7) {
+                        return Optional.empty();
+                    }
+                    leaf = Leaf.FEEDBACK;
+                    file = relative.subpath(6, depth);
+                } else {
+                    file = relative.subpath(5, depth);
+                }
             } else {
                 file = relative.subpath(4, depth);
             }

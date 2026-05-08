@@ -38,12 +38,14 @@ public class FeedbackService {
 
         byte[] content = file.getBytes();
         String sha256 = FileHasher.sha256Hex(content);
-        String feedbackId = UUID.randomUUID().toString();
         String fileName = sanitizeFileName(file.getOriginalFilename());
+        String feedbackId = feedbackRepository.findStoredFeedbackBySubmissionAndFileName(submissionId, fileName)
+            .map(StoredFeedback::id)
+            .orElseGet(() -> UUID.randomUUID().toString());
         Path destination = storageRoot.resolve("feedback").resolve(feedbackId + "-" + fileName);
 
         AtomicFileWriter.write(destination, content);
-        feedbackRepository.save(feedbackId, submissionId, destination.toString(), sha256, System.currentTimeMillis());
+        feedbackRepository.save(feedbackId, submissionId, fileName, destination.toString(), sha256, System.currentTimeMillis());
 
         return new FeedbackSummaryResponse(
             feedbackId,
@@ -65,6 +67,13 @@ public class FeedbackService {
         StoredFeedback feedback = feedbackRepository.findStoredFeedbackById(feedbackId)
             .orElseThrow(FeedbackNotFoundException::new);
         return new DownloadedFeedback(feedback.originalFileName(), Files.readAllBytes(Path.of(feedback.filePath())));
+    }
+
+    public void deleteFeedback(String feedbackId) throws IOException {
+        StoredFeedback feedback = feedbackRepository.findStoredFeedbackById(feedbackId)
+            .orElseThrow(FeedbackNotFoundException::new);
+        feedbackRepository.deleteById(feedbackId);
+        Files.deleteIfExists(Path.of(feedback.filePath()));
     }
 
     private String sanitizeFileName(String originalFileName) {

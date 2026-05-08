@@ -12,4 +12,6 @@ public interface FeedbackApiClient {
     DownloadedFile downloadFeedback(String feedbackId) throws IOException;
 
     FeedbackSummaryResponse uploadFeedback(String submissionId, Path file) throws IOException;
+
+    void deleteFeedback(String feedbackId) throws IOException;
 }

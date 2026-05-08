@@ -6,7 +6,10 @@ import edu.nyu.unidrive.client.net.RestSubmissionApiClient;
 import edu.nyu.unidrive.client.storage.InstructorWorkspace;
 import edu.nyu.unidrive.client.storage.ReceivedStateRepository;
 import edu.nyu.unidrive.client.storage.SyncStateRepository;
-import edu.nyu.unidrive.client.sync.InstructorFeedbackWatcher;
+import edu.nyu.unidrive.client.sync.FeedbackDirectoryWatcher;
+import edu.nyu.unidrive.client.sync.FeedbackReconcileService;
+import edu.nyu.unidrive.client.sync.FeedbackUploadService;
+import edu.nyu.unidrive.client.sync.InstructorFeedbackSyncService;
 import edu.nyu.unidrive.client.sync.InstructorSubmissionPollingService;
 import edu.nyu.unidrive.client.sync.PublishDirectoryWatcher;
 import edu.nyu.unidrive.client.sync.PublishSyncService;
@@ -43,14 +46,22 @@ public final class InstructorSyncServiceFactory {
                 Duration.ofSeconds(2)
             );
 
-            InstructorFeedbackWatcher feedbackWatcher = new InstructorFeedbackWatcher(
+            FeedbackUploadService feedbackUploadService = new FeedbackUploadService(
+                syncStateRepository,
                 new RestFeedbackApiClient(baseUrl, restTemplate),
-                receivedStateRepository,
-                submissionPolling.latestSubmissionByFeedbackDirectory(),
-                Duration.ofSeconds(2)
+                new RestSubmissionApiClient(baseUrl, restTemplate),
+                workspace.rootDirectory()
+            );
+            InstructorFeedbackSyncService feedbackSyncService = new InstructorFeedbackSyncService(
+                new FeedbackDirectoryWatcher(workspace.rootDirectory()),
+                feedbackUploadService,
+                new FeedbackReconcileService(syncStateRepository),
+                syncStateRepository,
+                workspace.rootDirectory(),
+                Duration.ofMillis(250)
             );
 
-            return new CompositeSyncServiceHandle(publishSyncService, submissionPolling, feedbackWatcher);
+            return new CompositeSyncServiceHandle(publishSyncService, submissionPolling, feedbackSyncService);
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to create instructor sync service.", exception);
         }

@@ -16,9 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 public final class InstructorSubmissionPollingService implements SyncServiceHandle {
@@ -28,7 +26,6 @@ public final class InstructorSubmissionPollingService implements SyncServiceHand
     private final MockCourseRegistry courseRegistry;
     private final ReceivedStateRepository receivedStateRepository;
     private final Duration pollInterval;
-    private final Map<Path, String> latestSubmissionByFeedbackDirectory = new ConcurrentHashMap<>();
     private Thread workerThread;
 
     public InstructorSubmissionPollingService(
@@ -87,17 +84,12 @@ public final class InstructorSubmissionPollingService implements SyncServiceHand
         Path submissionsDir = assignmentDir.resolve(CoursePath.INSTRUCTOR_SUBMISSIONS_DIR);
         Files.createDirectories(submissionsDir);
         Set<Path> expectedFiles = new HashSet<>();
-        Set<String> seenStudentSubmissions = new HashSet<>();
 
         for (SubmissionSummaryResponse submission : submissionApiClient.listSubmissions(coursePath)) {
             Path studentDir = submissionsDir.resolve(CoursePath.STUDENT_PREFIX + submission.getStudentId());
             Files.createDirectories(studentDir);
             Path feedbackDir = studentDir.resolve(CoursePath.FEEDBACK_DIR);
             Files.createDirectories(feedbackDir);
-
-            if (seenStudentSubmissions.add(submission.getStudentId())) {
-                latestSubmissionByFeedbackDirectory.put(feedbackDir.toAbsolutePath().normalize(), submission.getSubmissionId());
-            }
 
             Path destination = studentDir.resolve(submission.getFileName());
             expectedFiles.add(destination);
@@ -159,10 +151,6 @@ public final class InstructorSubmissionPollingService implements SyncServiceHand
             }
         }
         return false;
-    }
-
-    public Map<Path, String> latestSubmissionByFeedbackDirectory() {
-        return latestSubmissionByFeedbackDirectory;
     }
 
     @Override

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS submissions (
 CREATE TABLE IF NOT EXISTS feedback (
     id TEXT PRIMARY KEY,
     submission_id TEXT,
+    file_name TEXT,
     file_path TEXT,
     hash TEXT,
     returned_at INTEGER
