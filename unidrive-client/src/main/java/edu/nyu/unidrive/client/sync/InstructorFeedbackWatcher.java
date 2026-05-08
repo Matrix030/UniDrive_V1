@@ -5,36 +5,33 @@ import edu.nyu.unidrive.client.net.FeedbackApiClient;
 import edu.nyu.unidrive.client.storage.ReceivedStateRecord;
 import edu.nyu.unidrive.client.storage.ReceivedStateRepository;
 import edu.nyu.unidrive.common.model.SyncStatus;
+import edu.nyu.unidrive.common.util.FileHasher;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Stream;
 
 public final class InstructorFeedbackWatcher implements SyncServiceHandle {
 
     private final FeedbackApiClient feedbackApiClient;
-    private final Path feedbackDirectory;
     private final ReceivedStateRepository receivedStateRepository;
-    private final Map<String, String> latestSubmissionByStudent;
+    private final Map<Path, String> latestSubmissionByFeedbackDirectory;
     private final Duration pollInterval;
-    private final Set<Path> uploadedFiles = new HashSet<>();
+    private final Map<Path, String> uploadedHashes = new HashMap<>();
     private Thread workerThread;
 
     public InstructorFeedbackWatcher(
         FeedbackApiClient feedbackApiClient,
-        Path feedbackDirectory,
         ReceivedStateRepository receivedStateRepository,
-        Map<String, String> latestSubmissionByStudent,
+        Map<Path, String> latestSubmissionByFeedbackDirectory,
         Duration pollInterval
     ) {
         this.feedbackApiClient = feedbackApiClient;
-        this.feedbackDirectory = feedbackDirectory;
         this.receivedStateRepository = receivedStateRepository;
-        this.latestSubmissionByStudent = latestSubmissionByStudent;
+        this.latestSubmissionByFeedbackDirectory = latestSubmissionByFeedbackDirectory;
         this.pollInterval = pollInterval;
     }
 
@@ -49,13 +46,7 @@ public final class InstructorFeedbackWatcher implements SyncServiceHandle {
     }
 
     public void processOnce() {
-        try (Stream<Path> studentDirs = Files.list(feedbackDirectory)) {
-            studentDirs
-                .filter(Files::isDirectory)
-                .forEach(this::processStudentDirectory);
-        } catch (IOException exception) {
-            throw new IllegalStateException("Failed to scan feedback directory.", exception);
-        }
+        latestSubmissionByFeedbackDirectory.forEach(this::processFeedbackDirectory);
     }
 
     @Override
@@ -71,24 +62,25 @@ public final class InstructorFeedbackWatcher implements SyncServiceHandle {
         }
     }
 
-    private void processStudentDirectory(Path studentDir) {
-        String studentId = studentDir.getFileName().toString();
-        String submissionId = latestSubmissionByStudent.get(studentId);
-        if (submissionId == null) {
+    private void processFeedbackDirectory(Path feedbackDir, String submissionId) {
+        if (submissionId == null || !Files.isDirectory(feedbackDir)) {
             return;
         }
-        try (Stream<Path> files = Files.list(studentDir)) {
+        try (Stream<Path> files = Files.list(feedbackDir)) {
             files.filter(Files::isRegularFile).forEach(file -> uploadIfNew(submissionId, file));
         } catch (IOException exception) {
-            throw new IllegalStateException("Failed to scan feedback for " + studentId, exception);
+            throw new IllegalStateException("Failed to scan feedback directory " + feedbackDir, exception);
         }
     }
 
     private void uploadIfNew(String submissionId, Path file) {
-        if (uploadedFiles.contains(file)) {
-            return;
-        }
         try {
+            String sha256 = FileHasher.sha256Hex(file);
+            Path normalizedFile = file.toAbsolutePath().normalize();
+            ReceivedStateRecord existingRecord = receivedStateRepository.findByLocalPath(file).orElse(null);
+            if (sha256.equals(uploadedHashes.get(normalizedFile)) || isAlreadySynced(existingRecord, sha256)) {
+                return;
+            }
             receivedStateRepository.save(new ReceivedStateRecord(
                 file,
                 null,
@@ -99,7 +91,7 @@ public final class InstructorFeedbackWatcher implements SyncServiceHandle {
             ));
 
             var response = feedbackApiClient.uploadFeedback(submissionId, file);
-            uploadedFiles.add(file);
+            uploadedHashes.put(normalizedFile, sha256);
             receivedStateRepository.save(new ReceivedStateRecord(
                 file,
                 response.getFeedbackId(),
@@ -119,6 +111,13 @@ public final class InstructorFeedbackWatcher implements SyncServiceHandle {
             ));
             throw new IllegalStateException("Failed to upload feedback file " + file, exception);
         }
+    }
+
+    private boolean isAlreadySynced(ReceivedStateRecord existingRecord, String sha256) {
+        return existingRecord != null
+            && existingRecord.status() == SyncStatus.SYNCED
+            && sha256.equals(existingRecord.sha256())
+            && ReceivedReconcileService.SOURCE_INSTRUCTOR_FEEDBACKS.equals(existingRecord.source());
     }
 
     private void runLoop() {

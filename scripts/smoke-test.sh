@@ -137,7 +137,7 @@ run_client_flow_tests() {
     fi
     log "running client workspace/session/sync smoke tests"
     (cd "$ROOT_DIR" && ./mvnw -pl unidrive-client \
-        -Dtest=SessionPersistenceTest,FolderBootstrapServiceTest,InstructorFolderBootstrapServiceTest,CurrentFolderWorkflowIntegrationTest,AssignmentSyncServiceTest,SubmissionUploadServiceTest,SubmissionReconcileServiceTest,SubmissionSyncStateServiceTest,SyncDashboardSnapshotServiceTest \
+        -Dtest=SessionPersistenceTest,FolderBootstrapServiceTest,InstructorFolderBootstrapServiceTest,CurrentFolderWorkflowIntegrationTest,AssignmentSyncServiceTest,SubmissionUploadServiceTest,SubmissionReconcileServiceTest,SubmissionSyncStateServiceTest,SyncDashboardSnapshotServiceTest,FeedbackSyncServiceTest \
         test)
     pass "client workspace/session/sync smoke tests passed"
 }
@@ -197,6 +197,24 @@ smoke_login() {
         --data '{"email":"instructor@nyu.edu","password":"password123"}'
     assert_json '.status == "ok" and .data.userId == "instructor_rvg0000" and .data.email == "instructor@nyu.edu" and .data.role == "INSTRUCTOR" and (.data.accessToken | length > 0)' \
         "instructor login response contains expected identity"
+
+    request "second student login" 200 POST "/api/v1/auth/login" \
+        -H 'Content-Type: application/json' \
+        --data '{"email":"student2@nyu.edu","password":"password123"}'
+    assert_json '.status == "ok" and .data.userId == "ow2130" and .data.role == "STUDENT"' \
+        "second student login response contains expected identity"
+
+    request "third student login" 200 POST "/api/v1/auth/login" \
+        -H 'Content-Type: application/json' \
+        --data '{"email":"student3@nyu.edu","password":"password123"}'
+    assert_json '.status == "ok" and .data.userId == "js1234" and .data.role == "STUDENT"' \
+        "third student login response contains expected identity"
+
+    request "second instructor login" 200 POST "/api/v1/auth/login" \
+        -H 'Content-Type: application/json' \
+        --data '{"email":"ta@nyu.edu","password":"password123"}'
+    assert_json '.status == "ok" and .data.userId == "instructor_ow0000" and .data.role == "INSTRUCTOR"' \
+        "second instructor login response contains expected identity"
 
     request "wrong password rejected" 401 POST "/api/v1/auth/login" \
         -H 'Content-Type: application/json' \
@@ -286,14 +304,14 @@ smoke_submissions_and_feedback() {
 
     request "upload feedback" 200 POST "/api/v1/instructor/feedback/$submission_id" \
         -F "file=@$feedback_file;filename=feedback.txt"
-    assert_json --arg submission "$submission_id" --arg sha "$feedback_sha" '.status == "ok" and .data.submissionId == $submission and .data.studentId == "rvg9395" and .data.fileName == "feedback.txt" and .data.sha256 == $sha' \
+    assert_json --arg submission "$submission_id" --arg sha "$feedback_sha" '.status == "ok" and .data.submissionId == $submission and .data.term == "fall2026" and .data.course == "daa" and .data.assignmentId == "smoke-hashing" and .data.studentId == "rvg9395" and .data.fileName == "feedback.txt" and .data.sha256 == $sha' \
         "feedback upload response matches file"
     local feedback_id
     feedback_id=$(jq -r '.data.feedbackId' "$LAST_BODY")
     [ -n "$feedback_id" ] && [ "$feedback_id" != "null" ] || fail "feedback id missing from upload response"
 
     request "list feedback" 200 GET "/api/v1/feedback?studentId=$STUDENT_ID"
-    assert_json --arg id "$feedback_id" 'any(.data[]; .feedbackId == $id and .studentId == "rvg9395")' \
+    assert_json --arg id "$feedback_id" 'any(.data[]; .feedbackId == $id and .term == "fall2026" and .course == "daa" and .assignmentId == "smoke-hashing" and .studentId == "rvg9395")' \
         "list feedback includes uploaded feedback"
 
     download "download feedback" 200 "/api/v1/feedback/$feedback_id/download" "$SMOKE_DIR/downloads/feedback.txt"

@@ -1,11 +1,13 @@
 package edu.nyu.unidrive.client;
 
 import edu.nyu.unidrive.client.net.RestAssignmentApiClient;
+import edu.nyu.unidrive.client.net.RestFeedbackApiClient;
 import edu.nyu.unidrive.client.net.RestSubmissionApiClient;
 import edu.nyu.unidrive.client.storage.ClientWorkspace;
 import edu.nyu.unidrive.client.storage.ReceivedStateRepository;
 import edu.nyu.unidrive.client.storage.SyncStateRepository;
 import edu.nyu.unidrive.client.sync.AssignmentSyncService;
+import edu.nyu.unidrive.client.sync.FeedbackSyncService;
 import edu.nyu.unidrive.client.sync.ReceivedReconcileService;
 import edu.nyu.unidrive.client.sync.RemotePollingService;
 import edu.nyu.unidrive.client.sync.SubmissionDirectoryWatcher;
@@ -37,6 +39,10 @@ public final class DefaultSyncServiceFactory implements SyncServiceFactory {
                 new RestAssignmentApiClient(baseUrl, new RestTemplate()),
                 receivedStateRepository
             );
+            FeedbackSyncService feedbackSyncService = new FeedbackSyncService(
+                new RestFeedbackApiClient(baseUrl, new RestTemplate()),
+                receivedStateRepository
+            );
             ReceivedReconcileService receivedReconcileService = new ReceivedReconcileService(receivedStateRepository);
 
             SyncService submissionSyncService = new SyncService(
@@ -51,8 +57,10 @@ public final class DefaultSyncServiceFactory implements SyncServiceFactory {
             );
             RemotePollingService remotePollingService = new RemotePollingService(
                 assignmentSyncService,
+                feedbackSyncService,
                 receivedReconcileService,
                 workspace.rootDirectory(),
+                studentId,
                 new MockCourseRegistry(),
                 Duration.ofSeconds(2)
             );

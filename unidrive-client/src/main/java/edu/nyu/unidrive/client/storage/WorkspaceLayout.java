@@ -31,6 +31,9 @@ public final class WorkspaceLayout {
         try {
             Files.createDirectories(publishDir);
             Files.createDirectories(submissionsDir);
+            if (role == WorkspaceRole.STUDENT) {
+                Files.createDirectories(coursePath.feedbackDirIn(rootDirectory));
+            }
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to materialize assignment slot for " + coursePath, exception);
         }

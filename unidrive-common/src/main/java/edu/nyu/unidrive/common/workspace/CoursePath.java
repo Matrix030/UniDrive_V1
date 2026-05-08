@@ -9,6 +9,7 @@ public record CoursePath(String term, String courseSlug, String assignmentId) {
     public static final String INSTRUCTOR_SUBMISSIONS_DIR = "submissions";
     public static final String STUDENT_FILES_DIR = "files";
     public static final String STUDENT_SUBMISSION_DIR = "submission";
+    public static final String FEEDBACK_DIR = "feedback";
     public static final String STUDENT_PREFIX = "student_";
 
     public CoursePath {
@@ -37,6 +38,10 @@ public record CoursePath(String term, String courseSlug, String assignmentId) {
 
     public Path submissionsDirIn(Path workspaceRoot, WorkspaceRole role) {
         return resolveAgainst(workspaceRoot).resolve(submissionsDirName(role));
+    }
+
+    public Path feedbackDirIn(Path workspaceRoot) {
+        return resolveAgainst(workspaceRoot).resolve(FEEDBACK_DIR);
     }
 
     public static String publishDirName(WorkspaceRole role) {
@@ -69,6 +74,8 @@ public record CoursePath(String term, String courseSlug, String assignmentId) {
             leaf = Leaf.PUBLISH;
         } else if (INSTRUCTOR_SUBMISSIONS_DIR.equals(leafName) || STUDENT_SUBMISSION_DIR.equals(leafName)) {
             leaf = Leaf.SUBMISSIONS;
+        } else if (FEEDBACK_DIR.equals(leafName)) {
+            leaf = Leaf.FEEDBACK;
         } else {
             return Optional.empty();
         }
@@ -97,7 +104,8 @@ public record CoursePath(String term, String courseSlug, String assignmentId) {
 
     public enum Leaf {
         PUBLISH,
-        SUBMISSIONS
+        SUBMISSIONS,
+        FEEDBACK
     }
 
     public record ParsedLocation(CoursePath coursePath, Leaf leaf, Optional<String> studentId, Path relativeFile) {

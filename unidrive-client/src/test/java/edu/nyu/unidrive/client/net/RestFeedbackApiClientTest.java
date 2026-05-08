@@ -31,6 +31,9 @@ class RestFeedbackApiClientTest {
                     {
                       "feedbackId": "feedback-1",
                       "submissionId": "submission-1",
+                      "term": "fall2026",
+                      "course": "daa",
+                      "assignmentId": "hw1",
                       "studentId": "rvg9395",
                       "fileName": "Feedback.txt",
                       "sha256": "hash-1"
@@ -46,6 +49,9 @@ class RestFeedbackApiClientTest {
 
         assertEquals(1, feedback.size());
         assertEquals("feedback-1", feedback.getFirst().getFeedbackId());
+        assertEquals("fall2026", feedback.getFirst().getTerm());
+        assertEquals("daa", feedback.getFirst().getCourse());
+        assertEquals("hw1", feedback.getFirst().getAssignmentId());
         assertEquals("rvg9395", feedback.getFirst().getStudentId());
         server.verify();
     }

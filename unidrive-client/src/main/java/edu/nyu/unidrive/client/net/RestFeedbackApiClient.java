@@ -41,6 +41,9 @@ public final class RestFeedbackApiClient implements FeedbackApiClient {
             feedbackRows.add(new FeedbackSummaryResponse(
                 feedbackNode.path("feedbackId").asText(),
                 feedbackNode.path("submissionId").asText(),
+                feedbackNode.path("term").asText(),
+                feedbackNode.path("course").asText(),
+                feedbackNode.path("assignmentId").asText(),
                 feedbackNode.path("studentId").asText(),
                 feedbackNode.path("fileName").asText(),
                 feedbackNode.path("sha256").asText()
@@ -75,6 +78,9 @@ public final class RestFeedbackApiClient implements FeedbackApiClient {
         return new FeedbackSummaryResponse(
             dataNode.path("feedbackId").asText(),
             dataNode.path("submissionId").asText(),
+            dataNode.path("term").asText(),
+            dataNode.path("course").asText(),
+            dataNode.path("assignmentId").asText(),
             dataNode.path("studentId").asText(),
             dataNode.path("fileName").asText(),
             dataNode.path("sha256").asText()

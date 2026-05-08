@@ -8,14 +8,17 @@ This README is the final project report. It includes setup instructions, demo cr
 
 No external API key is required for this project. Authentication is implemented as a mocked SSO-style login module for the course project, so the first screen asks for an email and password instead of an API key.
 
-Use one of these demo accounts:
+Use one of these demo accounts. Every account uses password `password123`.
 
-| Role       | Email                | Password      | App user ID          |
-| ---------- | -------------------- | ------------- | -------------------- |
-| Student    | `student@nyu.edu`    | `password123` | `rvg9395`            |
-| Student    | `rvg9395@nyu.edu`    | `password123` | `rvg9395`            |
-| Instructor | `instructor@nyu.edu` | `password123` | `instructor_rvg0000` |
-| Instructor | `rvg0000@nyu.edu`    | `password123` | `instructor_rvg0000` |
+| Demo user | Role | Login email | App user ID | Demo workspace folder |
+| ---------- | ---- | ----------- | ----------- | --------------------- |
+| Main instructor | Instructor | `instructor@nyu.edu` | `instructor_rvg0000` | `demo-workspace/instructor_rvg0000` |
+| TA / second instructor | Instructor | `ta@nyu.edu` | `instructor_ow0000` | `demo-workspace/instructor_ow0000` |
+| Student 1 | Student | `student@nyu.edu` | `rvg9395` | `demo-workspace/student_rvg9395` |
+| Student 2 | Student | `student2@nyu.edu` | `ow2130` | `demo-workspace/student_ow2130` |
+| Student 3 | Student | `student3@nyu.edu` | `js1234` | `demo-workspace/student_js1234` |
+
+Login aliases also work: `rvg0000@nyu.edu` for the main instructor, `ow0000@nyu.edu` for the TA, `rvg9395@nyu.edu` for Student 1, `ow2130@nyu.edu` for Student 2, and `js1234@nyu.edu` for Student 3.
 
 ## Modules
 
@@ -56,7 +59,7 @@ The repository includes `scripts/smoke-test.sh`, which builds the project, start
 1. Client bootstraps a local workspace with:
    - term folders such as `fall2026/`
    - course folders such as `fall2026/daa/`
-   - assignment folders created by sync, each with `files/` and `submission/`
+   - assignment folders created by sync, each with `files/`, `submission/`, and `feedback/`
    - `sync-state.db`
 2. Files added to an assignment's `submission/` folder are detected by `WatchService`.
 3. The client records them as `PENDING`, computes SHA-256, uploads them, and transitions through:
@@ -65,13 +68,13 @@ The repository includes `scripts/smoke-test.sh`, which builds the project, start
    - `FAILED` on failure
 4. The client polls the server for:
    - assignment files into assignment `files/` folders
-   - feedback returned by the instructor
+   - feedback returned by the instructor into assignment `feedback/` folders
 
 ### Instructor
 
-1. Publish an assignment through the server API.
-2. Review synced submissions through the submissions API.
-3. Return feedback through the server API.
+1. Publish an assignment by dropping files into an assignment's `publish/` folder.
+2. Review synced submissions under `submissions/student_<id>/`.
+3. Return feedback by dropping files into `submissions/student_<id>/feedback/`.
 
 ## Quick Start
 
@@ -136,7 +139,7 @@ cd uniDrive
 If using Linux or macOS and `mvnw` is not executable, run:
 
 ```bash
-chmod +x mvnw scripts/smoke-test.sh
+chmod +x mvnw scripts/smoke-test.sh scripts/fresh-demo.sh
 ```
 
 Verify Java:
@@ -197,6 +200,8 @@ Run another JavaFX client for the student in a third terminal:
 
 Log in with `student@nyu.edu` / `password123`, then choose a different workspace folder such as `demo-workspace/manual-student`.
 
+For a larger demo, start more client terminals with separate homes and workspaces. Log in as `student2@nyu.edu`, `student3@nyu.edu`, or `ta@nyu.edu` to simulate multiple students and another instructor/TA.
+
 To override the server URL:
 
 ```bash
@@ -213,8 +218,8 @@ To override the server URL:
 
 | Role       | Folders                                                                                                                                         |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Student    | `<term>/<course>/<assignment>/files/` for received assignment files, `<term>/<course>/<assignment>/submission/` for student uploads             |
-| Instructor | `<term>/<course>/<assignment>/publish/` for assignment files, `<term>/<course>/<assignment>/submissions/student_<id>/` for received submissions |
+| Student    | `<term>/<course>/<assignment>/files/` for received assignment files, `<term>/<course>/<assignment>/submission/` for student uploads, `<term>/<course>/<assignment>/feedback/` for returned feedback |
+| Instructor | `<term>/<course>/<assignment>/publish/` for assignment files, `<term>/<course>/<assignment>/submissions/student_<id>/` for received submissions, `<term>/<course>/<assignment>/submissions/student_<id>/feedback/` for feedback returned to that student |
 
 ### Subsequent launches
 
@@ -244,8 +249,8 @@ Use three terminals so the server, instructor client, and student client all sta
 8. Watch the student workspace: the file should sync into `<term>/<course>/<assignment>/files/`.
 9. Drop or update a student solution file in the student workspace under `<term>/<course>/<assignment>/submission/`.
 10. Watch the student dashboard move the file through sync status, and watch the instructor workspace receive it under `<term>/<course>/<assignment>/submissions/student_rvg9395/`.
-11. Drop or update a feedback file in the instructor's feedback/submission-return flow for that student.
-12. Watch the student client receive the feedback after background sync.
+11. Drop or update a feedback file in the instructor workspace under `<term>/<course>/<assignment>/submissions/student_rvg9395/feedback/`.
+12. Watch the student client receive the feedback under `<term>/<course>/<assignment>/feedback/` after background sync.
 
 You can keep the folders open in your file manager while both clients run. As you drop or update files in the watched folders, the background sync services upload/download them through the server and the dashboard counts update automatically.
 
@@ -256,11 +261,41 @@ To run two clients at the same time without sharing saved sessions, use separate
 ./mvnw -pl unidrive-client javafx:run -Dunidrive.userHome=target/demo-home/student
 ```
 
+For a multi-user demo, use one unique `userHome` per client:
+
+```bash
+./mvnw -pl unidrive-client javafx:run -Dunidrive.userHome=target/demo-home/instructor
+./mvnw -pl unidrive-client javafx:run -Dunidrive.userHome=target/demo-home/ta
+./mvnw -pl unidrive-client javafx:run -Dunidrive.userHome=target/demo-home/student1
+./mvnw -pl unidrive-client javafx:run -Dunidrive.userHome=target/demo-home/student2
+./mvnw -pl unidrive-client javafx:run -Dunidrive.userHome=target/demo-home/student3
+```
+
 ## Build & Test
 
 ```bash
 ./mvnw test           # run all unit and integration tests
 ./mvnw clean package  # build all module jars
+```
+
+## Fresh Demo Reset
+
+Before a live demo, run this script to reset project state and rebuild from scratch:
+
+```bash
+./scripts/fresh-demo.sh
+```
+
+It does three things:
+
+1. Removes the server SQLite database and stored upload artifacts.
+2. Recreates `demo-workspace/` with one folder for each mocked user: `instructor_rvg0000`, `instructor_ow0000`, `student_rvg9395`, `student_ow2130`, and `student_js1234`.
+3. Runs `./mvnw clean install` from the repository root.
+
+To place the demo workspace somewhere else:
+
+```bash
+UNIDRIVE_DEMO_WORKSPACE=/path/to/demo-workspace ./scripts/fresh-demo.sh
 ```
 
 ## Smoke Test

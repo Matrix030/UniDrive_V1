@@ -7,6 +7,7 @@ import edu.nyu.unidrive.client.storage.ReceivedStateRepository;
 import edu.nyu.unidrive.common.dto.FeedbackSummaryResponse;
 import edu.nyu.unidrive.common.model.SyncStatus;
 import edu.nyu.unidrive.common.util.FileHasher;
+import edu.nyu.unidrive.common.workspace.CoursePath;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,11 +22,13 @@ public class FeedbackSyncService {
         this.receivedStateRepository = receivedStateRepository;
     }
 
-    public int syncFeedback(String studentId, Path feedbackDirectory) {
+    public int syncFeedback(String studentId, Path workspaceRoot) {
         try {
-            Files.createDirectories(feedbackDirectory);
             int downloadedCount = 0;
             for (FeedbackSummaryResponse feedback : feedbackApiClient.listFeedback(studentId)) {
+                CoursePath coursePath = new CoursePath(feedback.getTerm(), feedback.getCourse(), feedback.getAssignmentId());
+                Path feedbackDirectory = coursePath.feedbackDirIn(workspaceRoot);
+                Files.createDirectories(feedbackDirectory);
                 Path destination = feedbackDirectory.resolve(feedback.getFileName());
                 if (Files.exists(destination) && FileHasher.sha256Hex(destination).equals(feedback.getSha256())) {
                     receivedStateRepository.save(new ReceivedStateRecord(

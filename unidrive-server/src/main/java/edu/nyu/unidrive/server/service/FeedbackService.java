@@ -45,7 +45,16 @@ public class FeedbackService {
         AtomicFileWriter.write(destination, content);
         feedbackRepository.save(feedbackId, submissionId, destination.toString(), sha256, System.currentTimeMillis());
 
-        return new FeedbackSummaryResponse(feedbackId, submissionId, submission.studentId(), fileName, sha256);
+        return new FeedbackSummaryResponse(
+            feedbackId,
+            submissionId,
+            submission.term(),
+            submission.course(),
+            submission.assignmentId(),
+            submission.studentId(),
+            fileName,
+            sha256
+        );
     }
 
     public List<FeedbackSummaryResponse> listFeedback(String studentId) {

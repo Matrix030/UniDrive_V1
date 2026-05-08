@@ -30,7 +30,7 @@ public class FeedbackRepository {
     public List<FeedbackSummaryResponse> findByStudentId(String studentId) {
         return jdbcTemplate.query(
             """
-            SELECT f.id, f.submission_id, s.student_id, f.file_path, f.hash
+            SELECT f.id, f.submission_id, s.term, s.course, s.assignment_id, s.student_id, f.file_path, f.hash
             FROM feedback f
             JOIN submissions s ON s.id = f.submission_id
             WHERE s.student_id = ?
@@ -39,6 +39,9 @@ public class FeedbackRepository {
             (resultSet, rowNum) -> new FeedbackSummaryResponse(
                 resultSet.getString("id"),
                 resultSet.getString("submission_id"),
+                resultSet.getString("term"),
+                resultSet.getString("course"),
+                resultSet.getString("assignment_id"),
                 resultSet.getString("student_id"),
                 Path.of(resultSet.getString("file_path")).getFileName().toString().substring(resultSet.getString("id").length() + 1),
                 resultSet.getString("hash")

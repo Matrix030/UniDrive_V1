@@ -28,7 +28,7 @@ public final class InstructorSubmissionPollingService implements SyncServiceHand
     private final MockCourseRegistry courseRegistry;
     private final ReceivedStateRepository receivedStateRepository;
     private final Duration pollInterval;
-    private final Map<String, String> latestSubmissionByStudent = new ConcurrentHashMap<>();
+    private final Map<Path, String> latestSubmissionByFeedbackDirectory = new ConcurrentHashMap<>();
     private Thread workerThread;
 
     public InstructorSubmissionPollingService(
@@ -87,12 +87,17 @@ public final class InstructorSubmissionPollingService implements SyncServiceHand
         Path submissionsDir = assignmentDir.resolve(CoursePath.INSTRUCTOR_SUBMISSIONS_DIR);
         Files.createDirectories(submissionsDir);
         Set<Path> expectedFiles = new HashSet<>();
+        Set<String> seenStudentSubmissions = new HashSet<>();
 
         for (SubmissionSummaryResponse submission : submissionApiClient.listSubmissions(coursePath)) {
-            latestSubmissionByStudent.put(submission.getStudentId(), submission.getSubmissionId());
-
             Path studentDir = submissionsDir.resolve(CoursePath.STUDENT_PREFIX + submission.getStudentId());
             Files.createDirectories(studentDir);
+            Path feedbackDir = studentDir.resolve(CoursePath.FEEDBACK_DIR);
+            Files.createDirectories(feedbackDir);
+
+            if (seenStudentSubmissions.add(submission.getStudentId())) {
+                latestSubmissionByFeedbackDirectory.put(feedbackDir.toAbsolutePath().normalize(), submission.getSubmissionId());
+            }
 
             Path destination = studentDir.resolve(submission.getFileName());
             expectedFiles.add(destination);
@@ -135,6 +140,9 @@ public final class InstructorSubmissionPollingService implements SyncServiceHand
     private void removeStaleSubmissionFiles(Path submissionsDir, Set<Path> expectedFiles) throws IOException {
         try (Stream<Path> files = Files.walk(submissionsDir)) {
             for (Path file : files.filter(Files::isRegularFile).toList()) {
+                if (isFeedbackFile(submissionsDir, file)) {
+                    continue;
+                }
                 if (!expectedFiles.contains(file)) {
                     Files.delete(file);
                     receivedStateRepository.deleteByLocalPath(file);
@@ -143,8 +151,18 @@ public final class InstructorSubmissionPollingService implements SyncServiceHand
         }
     }
 
-    public Map<String, String> latestSubmissionByStudent() {
-        return latestSubmissionByStudent;
+    private boolean isFeedbackFile(Path submissionsDir, Path file) {
+        Path relative = submissionsDir.relativize(file);
+        for (Path name : relative) {
+            if (CoursePath.FEEDBACK_DIR.equals(name.toString())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public Map<Path, String> latestSubmissionByFeedbackDirectory() {
+        return latestSubmissionByFeedbackDirectory;
     }
 
     @Override

@@ -33,6 +33,7 @@ class CoursePathTest {
         CoursePath coursePath = new CoursePath("fall2026", "daa", "hw1");
         assertEquals(ROOT.resolve("fall2026/daa/hw1/files"), coursePath.publishDirIn(ROOT, WorkspaceRole.STUDENT));
         assertEquals(ROOT.resolve("fall2026/daa/hw1/submission"), coursePath.submissionsDirIn(ROOT, WorkspaceRole.STUDENT));
+        assertEquals(ROOT.resolve("fall2026/daa/hw1/feedback"), coursePath.feedbackDirIn(ROOT));
     }
 
     @Test
@@ -80,6 +81,15 @@ class CoursePathTest {
     }
 
     @Test
+    void parseRecognizesFeedbackDir() {
+        Path file = ROOT.resolve("fall2026/daa/hw1/feedback/comments.txt");
+        ParsedLocation parsed = CoursePath.parseFromWorkspace(ROOT, file).orElseThrow();
+        assertEquals(Leaf.FEEDBACK, parsed.leaf());
+        assertEquals(Optional.empty(), parsed.studentId());
+        assertEquals(Path.of("comments.txt"), parsed.relativeFile());
+    }
+
+    @Test
     void parseReturnsEmptyForFilesOutsideWorkspace() {
         Path file = Path.of("/tmp/elsewhere/foo.txt").toAbsolutePath();
         assertTrue(CoursePath.parseFromWorkspace(ROOT, file).isEmpty());
@@ -87,7 +97,7 @@ class CoursePathTest {
 
     @Test
     void parseReturnsEmptyWhenLeafIsUnknown() {
-        Path file = ROOT.resolve("fall2026/daa/hw1/feedback/spec.pdf");
+        Path file = ROOT.resolve("fall2026/daa/hw1/unknown/spec.pdf");
         assertTrue(CoursePath.parseFromWorkspace(ROOT, file).isEmpty());
     }
 

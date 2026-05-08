@@ -261,7 +261,14 @@ public final class DashboardScene {
             String source = session.role() == UserRole.STUDENT
                 ? ReceivedReconcileService.SOURCE_ASSIGNMENTS
                 : ReceivedReconcileService.SOURCE_INSTRUCTOR_SUBMISSIONS;
-            tableView.setItems(FXCollections.observableArrayList(loadReceivedRows(source)));
+            if (session.role() == UserRole.STUDENT) {
+                tableView.setItems(FXCollections.observableArrayList(loadReceivedRows(
+                    ReceivedReconcileService.SOURCE_ASSIGNMENTS,
+                    ReceivedReconcileService.SOURCE_FEEDBACK
+                )));
+            } else {
+                tableView.setItems(FXCollections.observableArrayList(loadReceivedRows(source)));
+            }
         }
     }
 
@@ -319,9 +326,10 @@ public final class DashboardScene {
         return new DashboardRow(displayName(root, record.localPath()), record.status().name(), record.remoteId(), record.sha256(), record.lastSynced());
     }
 
-    private List<DashboardRow> loadReceivedRows(String source) {
+    private List<DashboardRow> loadReceivedRows(String... sources) {
+        List<String> allowedSources = List.of(sources);
         return receivedStateRepository.findAll().stream()
-            .filter(row -> source.equals(row.source()))
+            .filter(row -> allowedSources.contains(row.source()))
             .filter(row -> !isIgnoredReceivedFile(row.localPath()))
             .map(row -> fromReceivedStateRecord(workspaceRoot, row))
             .toList();

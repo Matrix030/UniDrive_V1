@@ -1,10 +1,12 @@
 package edu.nyu.unidrive.client;
 
 import edu.nyu.unidrive.client.net.RestAssignmentApiClient;
+import edu.nyu.unidrive.client.net.RestFeedbackApiClient;
 import edu.nyu.unidrive.client.net.RestSubmissionApiClient;
 import edu.nyu.unidrive.client.storage.InstructorWorkspace;
 import edu.nyu.unidrive.client.storage.ReceivedStateRepository;
 import edu.nyu.unidrive.client.storage.SyncStateRepository;
+import edu.nyu.unidrive.client.sync.InstructorFeedbackWatcher;
 import edu.nyu.unidrive.client.sync.InstructorSubmissionPollingService;
 import edu.nyu.unidrive.client.sync.PublishDirectoryWatcher;
 import edu.nyu.unidrive.client.sync.PublishSyncService;
@@ -41,7 +43,14 @@ public final class InstructorSyncServiceFactory {
                 Duration.ofSeconds(2)
             );
 
-            return new CompositeSyncServiceHandle(publishSyncService, submissionPolling);
+            InstructorFeedbackWatcher feedbackWatcher = new InstructorFeedbackWatcher(
+                new RestFeedbackApiClient(baseUrl, restTemplate),
+                receivedStateRepository,
+                submissionPolling.latestSubmissionByFeedbackDirectory(),
+                Duration.ofSeconds(2)
+            );
+
+            return new CompositeSyncServiceHandle(publishSyncService, submissionPolling, feedbackWatcher);
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to create instructor sync service.", exception);
         }

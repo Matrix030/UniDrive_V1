@@ -67,6 +67,9 @@ class FeedbackControllerTest {
             .andExpect(jsonPath("$.message").value("Feedback uploaded successfully."))
             .andExpect(jsonPath("$.data.feedbackId").value(matchesPattern("[0-9a-f\\-]{36}")))
             .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+            .andExpect(jsonPath("$.data.term").value("fall2026"))
+            .andExpect(jsonPath("$.data.course").value("daa"))
+            .andExpect(jsonPath("$.data.assignmentId").value("assignment-1"))
             .andExpect(jsonPath("$.data.studentId").value("rvg9395"))
             .andExpect(jsonPath("$.data.fileName").value("Feedback.txt"))
             .andExpect(jsonPath("$.data.sha256").value(sha256));
@@ -95,6 +98,9 @@ class FeedbackControllerTest {
             .andExpect(jsonPath("$.status").value("ok"))
             .andExpect(jsonPath("$.message").value("Feedback retrieved successfully."))
             .andExpect(jsonPath("$.data.length()").value(1))
+            .andExpect(jsonPath("$.data[0].term").value("fall2026"))
+            .andExpect(jsonPath("$.data[0].course").value("daa"))
+            .andExpect(jsonPath("$.data[0].assignmentId").value("assignment-1"))
             .andExpect(jsonPath("$.data[0].studentId").value("rvg9395"));
     }
 

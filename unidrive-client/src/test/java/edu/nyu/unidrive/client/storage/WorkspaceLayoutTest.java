@@ -47,6 +47,7 @@ class WorkspaceLayoutTest {
         assertEquals(tempDir.resolve("fall2026/daa/hw1/submission"), slot.submissionsDir());
         assertTrue(Files.isDirectory(slot.publishDir()));
         assertTrue(Files.isDirectory(slot.submissionsDir()));
+        assertTrue(Files.isDirectory(tempDir.resolve("fall2026/daa/hw1/feedback")));
     }
 
     @Test

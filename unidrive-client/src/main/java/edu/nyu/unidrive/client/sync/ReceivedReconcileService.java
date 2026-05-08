@@ -49,6 +49,8 @@ public final class ReceivedReconcileService {
             source = SOURCE_ASSIGNMENTS;
         } else if (location.leaf() == Leaf.SUBMISSIONS && location.studentId().isPresent()) {
             source = SOURCE_INSTRUCTOR_SUBMISSIONS;
+        } else if (location.leaf() == Leaf.FEEDBACK) {
+            source = SOURCE_FEEDBACK;
         } else {
             return;
         }

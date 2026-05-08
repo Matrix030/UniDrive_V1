@@ -80,6 +80,13 @@ class AuthControllerTest {
     }
 
     @Test
+    void loginSupportsAdditionalDemoAccounts() throws Exception {
+        expectLogin("student2@nyu.edu", "ow2130", "STUDENT");
+        expectLogin("student3@nyu.edu", "js1234", "STUDENT");
+        expectLogin("ta@nyu.edu", "instructor_ow0000", "INSTRUCTOR");
+    }
+
+    @Test
     void loginRejectsInvalidCredentials() throws Exception {
         mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -102,5 +109,14 @@ class AuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"student@nyu.edu\",\"password\":\"\"}"))
             .andExpect(status().isBadRequest());
+    }
+
+    private void expectLogin(String email, String userId, String role) throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"" + email + "\",\"password\":\"password123\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.userId").value(userId))
+            .andExpect(jsonPath("$.data.role").value(role));
     }
 }
