@@ -47,6 +47,7 @@ class AssignmentSchemaMigratorTest {
 
         List<Map<String, Object>> columns = jdbcTemplate.queryForList("PRAGMA table_info(assignments)");
         assertTrue(columns.stream().anyMatch(column -> "file_name".equals(column.get("name"))));
+        assertTrue(columns.stream().anyMatch(column -> "deadline".equals(column.get("name"))));
         assertEquals("spec.md", jdbcTemplate.queryForObject("SELECT file_name FROM assignments WHERE id = ?", String.class, "hw1"));
 
         AssignmentRepository repository = new AssignmentRepository(jdbcTemplate);
@@ -63,6 +64,7 @@ class AssignmentSchemaMigratorTest {
                 term TEXT,
                 course TEXT,
                 title TEXT,
+                deadline INTEGER,
                 published_at INTEGER,
                 file_path TEXT,
                 hash TEXT,
@@ -70,12 +72,13 @@ class AssignmentSchemaMigratorTest {
             )
             """);
         jdbcTemplate.update(
-            "INSERT INTO assignments (id, file_name, term, course, title, published_at, file_path, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO assignments (id, file_name, term, course, title, deadline, published_at, file_path, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             "hw1",
             "starter.zip",
             "fall2026",
             "daa",
             "Assignment 1",
+            4102444740000L,
             123L,
             tempDir.resolve("starter.zip").toString(),
             "def456"
@@ -88,6 +91,33 @@ class AssignmentSchemaMigratorTest {
 
         assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM assignments", Integer.class));
         assertEquals("starter.zip", jdbcTemplate.queryForObject("SELECT file_name FROM assignments WHERE id = ?", String.class, "hw1"));
+        assertEquals(4102444740000L, jdbcTemplate.queryForObject("SELECT deadline FROM assignments WHERE id = ?", Long.class, "hw1"));
+    }
+
+    @Test
+    void migrateAddsDeadlineToCurrentAssignmentsTable(@TempDir Path tempDir) {
+        JdbcTemplate jdbcTemplate = jdbcTemplate(tempDir.resolve("missing-deadline.db"));
+        jdbcTemplate.execute("""
+            CREATE TABLE assignments (
+                id TEXT NOT NULL,
+                file_name TEXT NOT NULL,
+                term TEXT,
+                course TEXT,
+                title TEXT,
+                published_at INTEGER,
+                file_path TEXT,
+                hash TEXT,
+                PRIMARY KEY (id, file_name)
+            )
+            """);
+
+        new AssignmentSchemaMigrator(
+            jdbcTemplate,
+            new DataSourceTransactionManager(jdbcTemplate.getDataSource())
+        ).migrate();
+
+        List<Map<String, Object>> columns = jdbcTemplate.queryForList("PRAGMA table_info(assignments)");
+        assertTrue(columns.stream().anyMatch(column -> "deadline".equals(column.get("name"))));
     }
 
     private JdbcTemplate jdbcTemplate(Path databasePath) {

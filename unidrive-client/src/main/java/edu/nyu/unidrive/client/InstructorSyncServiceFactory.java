@@ -26,7 +26,8 @@ public final class InstructorSyncServiceFactory {
             RestTemplate restTemplate = new RestTemplate();
             PublishDirectoryWatcher publishWatcher = new PublishDirectoryWatcher(workspace.rootDirectory());
             PublishUploadService publishUploadService = new PublishUploadService(
-                new RestAssignmentApiClient(baseUrl, restTemplate)
+                new RestAssignmentApiClient(baseUrl, restTemplate),
+                workspace.rootDirectory()
             );
             SyncStateRepository syncStateRepository = new SyncStateRepository(workspace.databasePath());
             ReceivedStateRepository receivedStateRepository = new ReceivedStateRepository(workspace.databasePath());

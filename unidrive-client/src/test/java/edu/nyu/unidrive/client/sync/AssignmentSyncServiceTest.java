@@ -160,7 +160,7 @@ class AssignmentSyncServiceTest {
         }
 
         @Override
-        public AssignmentSummaryResponse publishAssignment(CoursePath coursePath, String title, Path file) {
+        public AssignmentSummaryResponse publishAssignment(CoursePath coursePath, String title, String deadline, Path file) {
             return null;
         }
 

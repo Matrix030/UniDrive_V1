@@ -5,6 +5,7 @@ import edu.nyu.unidrive.common.dto.SubmissionUploadResponse;
 import edu.nyu.unidrive.common.model.SyncStatus;
 import edu.nyu.unidrive.server.repository.SubmissionRepository.StoredSubmission;
 import edu.nyu.unidrive.common.util.FileHasher;
+import edu.nyu.unidrive.server.repository.AssignmentRepository;
 import edu.nyu.unidrive.server.repository.SubmissionRepository;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,13 +23,16 @@ public class SubmissionService {
 
     private final Path storageRoot;
     private final SubmissionRepository submissionRepository;
+    private final AssignmentRepository assignmentRepository;
 
     public SubmissionService(
         @Value("${unidrive.storage.root:unidrive-server/target/storage}") String storageRoot,
-        SubmissionRepository submissionRepository
+        SubmissionRepository submissionRepository,
+        AssignmentRepository assignmentRepository
     ) {
         this.storageRoot = Path.of(storageRoot);
         this.submissionRepository = submissionRepository;
+        this.assignmentRepository = assignmentRepository;
     }
 
     public SubmissionUploadResponse storeSubmission(
@@ -39,6 +43,8 @@ public class SubmissionService {
         String providedSha256,
         MultipartFile file
     ) throws IOException {
+        ensureSubmissionWindowOpen(term, course, assignmentId);
+
         byte[] content = file.getBytes();
         String computedSha256 = FileHasher.sha256Hex(content);
 
@@ -106,8 +112,28 @@ public class SubmissionService {
     public void deleteSubmission(String submissionId) throws IOException {
         StoredSubmission storedSubmission = submissionRepository.findStoredSubmissionById(submissionId)
             .orElseThrow(SubmissionNotFoundException::new);
+        submissionRepository.findSubmissionDetailsById(submissionId)
+            .ifPresent(details -> ensureDeletionWindowOpen(details.term(), details.course(), details.assignmentId()));
         Files.deleteIfExists(Path.of(storedSubmission.filePath()));
         submissionRepository.deleteById(submissionId);
+    }
+
+    private void ensureSubmissionWindowOpen(String term, String course, String assignmentId) {
+        AssignmentRepository.AssignmentDeadline assignmentDeadline = assignmentRepository
+            .findDeadlineByAssignment(term, course, assignmentId)
+            .orElseThrow(AssignmentNotFoundException::new);
+        if (assignmentDeadline.deadlineMillis() != null && System.currentTimeMillis() > assignmentDeadline.deadlineMillis()) {
+            throw new DeadlinePassedException();
+        }
+    }
+
+    private void ensureDeletionWindowOpen(String term, String course, String assignmentId) {
+        assignmentRepository.findDeadlineByAssignment(term, course, assignmentId)
+            .map(AssignmentRepository.AssignmentDeadline::deadlineMillis)
+            .filter(deadline -> System.currentTimeMillis() > deadline)
+            .ifPresent(deadline -> {
+                throw new DeadlinePassedException();
+            });
     }
 
     private void deleteExistingSubmissionsForFile(
@@ -137,6 +163,12 @@ public class SubmissionService {
     }
 
     public static final class SubmissionNotFoundException extends RuntimeException {
+    }
+
+    public static final class AssignmentNotFoundException extends RuntimeException {
+    }
+
+    public static final class DeadlinePassedException extends RuntimeException {
     }
 
     public record DownloadedSubmission(String fileName, byte[] content) {

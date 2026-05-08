@@ -7,6 +7,8 @@ import edu.nyu.unidrive.server.repository.AssignmentRepository.StoredAssignment;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -31,11 +33,13 @@ public class AssignmentService {
         String course,
         String assignmentId,
         String title,
+        String deadline,
         MultipartFile file
     ) throws IOException {
         byte[] content = file.getBytes();
         String sha256 = FileHasher.sha256Hex(content);
         String fileName = sanitizeFileName(file.getOriginalFilename());
+        long deadlineMillis = parseDeadline(deadline);
         Path destination = storageRoot
             .resolve(term)
             .resolve(course)
@@ -50,12 +54,13 @@ public class AssignmentService {
             term,
             course,
             title,
+            deadlineMillis,
             System.currentTimeMillis(),
             destination.toString(),
             sha256
         );
 
-        return new AssignmentSummaryResponse(assignmentId, term, course, title, fileName, sha256);
+        return new AssignmentSummaryResponse(assignmentId, term, course, title, fileName, sha256, Instant.ofEpochMilli(deadlineMillis).toString());
     }
 
     public List<AssignmentSummaryResponse> listAssignments(String term, String course) {
@@ -83,7 +88,21 @@ public class AssignmentService {
         return fileNamePath == null ? "assignment.bin" : fileNamePath.toString();
     }
 
+    private long parseDeadline(String deadline) {
+        if (deadline == null || deadline.isBlank()) {
+            throw new InvalidDeadlineException();
+        }
+        try {
+            return Instant.parse(deadline.trim()).toEpochMilli();
+        } catch (DateTimeParseException exception) {
+            throw new InvalidDeadlineException();
+        }
+    }
+
     public static final class AssignmentNotFoundException extends RuntimeException {
+    }
+
+    public static final class InvalidDeadlineException extends RuntimeException {
     }
 
     public record DownloadedAssignment(String fileName, byte[] content) {

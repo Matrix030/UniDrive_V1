@@ -245,14 +245,15 @@ Use three terminals so the server, instructor client, and student client all sta
 4. In the instructor client, log in with `instructor@nyu.edu` / `password123` and choose an instructor workspace folder.
 5. In the student client, log in with `student@nyu.edu` / `password123` and choose a different student workspace folder.
 6. In the instructor dashboard, create an assignment slot for a course and assignment id.
-7. Drop or update an assignment file in the instructor workspace under `<term>/<course>/<assignment>/publish/`.
-8. Watch the student workspace: the file should sync into `<term>/<course>/<assignment>/files/`.
-9. Drop or update a student solution file in the student workspace under `<term>/<course>/<assignment>/submission/`.
-10. Watch the student dashboard move the file through sync status, and watch the instructor workspace receive it under `<term>/<course>/<assignment>/submissions/student_rvg9395/`.
-11. Drop or update a feedback file in the instructor workspace under `<term>/<course>/<assignment>/submissions/student_rvg9395/feedback/`.
-12. Watch the student client receive the feedback under `<term>/<course>/<assignment>/feedback/` after background sync.
+7. Choose the assignment deadline with the calendar control and enter the time of day as `HH:mm`.
+8. Drop or update an assignment file in the instructor workspace under `<term>/<course>/<assignment>/publish/`.
+9. Watch the student workspace: the file should sync into `<term>/<course>/<assignment>/files/`.
+10. Drop or update a student solution file in the student workspace under `<term>/<course>/<assignment>/submission/`.
+11. Watch the student dashboard move the file through sync status, and watch the instructor workspace receive it under `<term>/<course>/<assignment>/submissions/student_rvg9395/`.
+12. Drop or update a feedback file in the instructor workspace under `<term>/<course>/<assignment>/submissions/student_rvg9395/feedback/`.
+13. Watch the student client receive the feedback under `<term>/<course>/<assignment>/feedback/` after background sync.
 
-You can keep the folders open in your file manager while both clients run. As you drop or update files in the watched folders, the background sync services upload/download them through the server and the dashboard counts update automatically.
+You can keep the folders open in your file manager while both clients run. As you drop or update files in the watched folders, the background sync services upload/download them through the server and the dashboard counts update automatically. After an assignment deadline passes, the server rejects student submission uploads, edits, and deletes with HTTP `409 Conflict`.
 
 To run two clients at the same time without sharing saved sessions, use separate fake home directories:
 
@@ -318,8 +319,8 @@ It verifies:
 
 - student and instructor mock login success
 - login errors for wrong password, unknown email, blank email, and blank password
-- assignment publish, list, download, delete, and missing-assignment errors
-- submission upload, list, filtered list, download, delete, SHA-256 mismatch, and missing-submission errors
+- assignment publish with deadline, list, download, delete, and missing-assignment errors
+- submission upload, list, filtered list, download, delete, deadline rejection, SHA-256 mismatch, and missing-submission errors
 - feedback upload, list, download, missing-submission, and missing-feedback errors
 - downloaded assignment, submission, and feedback contents match the uploaded files
 - selected client workspace, session, dashboard snapshot, and sync-service tests still pass
@@ -340,15 +341,15 @@ UNIDRIVE_SMOKE_SKIP_CLIENT_TESTS=1 ./scripts/smoke-test.sh   # only run server/A
 
 ### Submissions
 
-- `POST /api/v1/submissions/{term}/{course}/{assignmentId}`
+- `POST /api/v1/submissions/{term}/{course}/{assignmentId}` rejects uploads after the assignment `deadline`
 - `GET /api/v1/submissions?term=...&course=...&assignmentId=...`
 - `GET /api/v1/submissions?term=...&course=...&assignmentId=...&studentId=...`
 - `GET /api/v1/submissions/{submissionId}/download`
-- `DELETE /api/v1/submissions/{submissionId}`
+- `DELETE /api/v1/submissions/{submissionId}` rejects deletes after the assignment `deadline`
 
 ### Assignments
 
-- `POST /api/v1/instructor/assignments/{term}/{course}/{assignmentId}`
+- `POST /api/v1/instructor/assignments/{term}/{course}/{assignmentId}` with multipart fields `title`, `deadline`, and `file`; `deadline` is an ISO-8601 UTC instant such as `2026-12-15T23:59:00Z`
 - `GET /api/v1/assignments?term=...&course=...`
 - `GET /api/v1/assignments/{assignmentId}/download?fileName=...`
 - `DELETE /api/v1/instructor/assignments/{assignmentId}?fileName=...`
@@ -366,7 +367,7 @@ The project uses TDD and currently verifies:
 - hashing
 - shared DTO contracts
 - server upload/list/download flows
-- assignment publish/list/download flows
+- assignment publish/list/download flows, including deadline persistence
 - feedback upload/list/download flows
 - client sync-state persistence
 - workspace bootstrap

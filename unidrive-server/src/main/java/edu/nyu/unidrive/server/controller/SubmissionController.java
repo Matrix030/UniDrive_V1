@@ -77,6 +77,12 @@ public class SubmissionController {
         } catch (SubmissionService.HashMismatchException exception) {
             return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                 .body(ApiResponse.error("Uploaded file hash did not match the provided SHA-256."));
+        } catch (SubmissionService.AssignmentNotFoundException exception) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error("Assignment was not found."));
+        } catch (SubmissionService.DeadlinePassedException exception) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error("Assignment deadline has passed."));
         }
     }
 
@@ -87,6 +93,9 @@ public class SubmissionController {
             return ResponseEntity.ok(ApiResponse.ok(null, "Submission deleted successfully."));
         } catch (SubmissionService.SubmissionNotFoundException exception) {
             return ResponseEntity.notFound().build();
+        } catch (SubmissionService.DeadlinePassedException exception) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error("Assignment deadline has passed."));
         }
     }
 }

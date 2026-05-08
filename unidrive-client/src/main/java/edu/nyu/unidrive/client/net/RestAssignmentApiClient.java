@@ -47,7 +47,8 @@ public final class RestAssignmentApiClient implements AssignmentApiClient {
                 assignmentNode.path("course").asText(null),
                 assignmentNode.path("title").asText(),
                 assignmentNode.path("fileName").asText(),
-                assignmentNode.path("sha256").asText()
+                assignmentNode.path("sha256").asText(),
+                assignmentNode.path("deadline").asText(null)
             ));
         }
         return assignments;
@@ -73,12 +74,13 @@ public final class RestAssignmentApiClient implements AssignmentApiClient {
     }
 
     @Override
-    public AssignmentSummaryResponse publishAssignment(CoursePath coursePath, String title, Path file) throws IOException {
+    public AssignmentSummaryResponse publishAssignment(CoursePath coursePath, String title, String deadline, Path file) throws IOException {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("title", title);
+        body.add("deadline", deadline);
         body.add("file", new NamedByteArrayResource(file.getFileName().toString(), Files.readAllBytes(file)));
 
         String url = baseUrl + "/api/v1/instructor/assignments/" + coursePath.term()
@@ -96,7 +98,8 @@ public final class RestAssignmentApiClient implements AssignmentApiClient {
             dataNode.path("course").asText(null),
             dataNode.path("title").asText(),
             dataNode.path("fileName").asText(),
-            dataNode.path("sha256").asText()
+            dataNode.path("sha256").asText(),
+            dataNode.path("deadline").asText(null)
         );
     }
 

@@ -6,6 +6,7 @@ import edu.nyu.unidrive.server.service.AssignmentService;
 import java.util.List;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -31,10 +32,16 @@ public class AssignmentController {
         @PathVariable("course") String course,
         @PathVariable("assignmentId") String assignmentId,
         @RequestParam("title") String title,
+        @RequestParam("deadline") String deadline,
         @RequestParam("file") MultipartFile file
     ) throws Exception {
-        AssignmentSummaryResponse response = assignmentService.publishAssignment(term, course, assignmentId, title, file);
-        return ResponseEntity.ok(ApiResponse.ok(response, "Assignment published successfully."));
+        try {
+            AssignmentSummaryResponse response = assignmentService.publishAssignment(term, course, assignmentId, title, deadline, file);
+            return ResponseEntity.ok(ApiResponse.ok(response, "Assignment published successfully."));
+        } catch (AssignmentService.InvalidDeadlineException exception) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("Assignment deadline must be an ISO-8601 UTC instant."));
+        }
     }
 
     @GetMapping("/api/v1/assignments")

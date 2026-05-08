@@ -7,6 +7,7 @@ import edu.nyu.unidrive.client.InstructorSyncServiceFactory;
 import edu.nyu.unidrive.client.SyncServiceHandle;
 import edu.nyu.unidrive.client.session.SessionConfig;
 import edu.nyu.unidrive.client.session.UserRole;
+import edu.nyu.unidrive.client.storage.AssignmentDeadlineStore;
 import edu.nyu.unidrive.client.storage.FolderBootstrapService;
 import edu.nyu.unidrive.client.storage.InstructorFolderBootstrapService;
 import edu.nyu.unidrive.client.storage.InstructorWorkspace;
@@ -23,6 +24,8 @@ import edu.nyu.unidrive.common.workspace.MockCourseRegistry;
 import edu.nyu.unidrive.common.workspace.MockCourseRegistry.Course;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -35,6 +38,7 @@ import javafx.collections.FXCollections;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
@@ -183,6 +187,13 @@ public final class DashboardScene {
         TextField idField = new TextField();
         idField.setPromptText("assignment id (e.g. hw1)");
 
+        DatePicker deadlineDatePicker = new DatePicker(LocalDate.now().plusDays(7));
+        deadlineDatePicker.setPromptText("deadline date");
+
+        TextField deadlineTimeField = new TextField("23:59");
+        deadlineTimeField.setPromptText("time (HH:mm)");
+        deadlineTimeField.setPrefColumnCount(5);
+
         Label statusLabel = new Label();
 
         Button createButton = new Button("Create assignment slot");
@@ -200,15 +211,40 @@ public final class DashboardScene {
             try {
                 CoursePath coursePath = new CoursePath(registry.currentTerm(), course.slug(), assignmentId);
                 WorkspaceLayout.ensureAssignmentSlot(workspaceRoot, coursePath, edu.nyu.unidrive.common.workspace.WorkspaceRole.INSTRUCTOR);
+                AssignmentDeadlineStore.writeDeadline(
+                    workspaceRoot,
+                    coursePath,
+                    toDeadlineInstant(deadlineDatePicker.getValue(), deadlineTimeField.getText())
+                );
                 idField.clear();
                 statusLabel.setText("Created " + coursePath.toRelativePath() + " — drop a file into publish/ to publish.");
-            } catch (RuntimeException exception) {
+            } catch (IllegalArgumentException exception) {
+                statusLabel.setText("Choose a deadline date and enter time as HH:mm.");
+            } catch (Exception exception) {
                 statusLabel.setText("Failed: " + exception.getMessage());
             }
         });
 
-        HBox bar = new HBox(8, new Label("New assignment:"), courseChoice, idField, createButton, statusLabel);
+        HBox bar = new HBox(
+            8,
+            new Label("New assignment:"),
+            courseChoice,
+            idField,
+            new Label("Deadline:"),
+            deadlineDatePicker,
+            deadlineTimeField,
+            createButton,
+            statusLabel
+        );
         return bar;
+    }
+
+    private String toDeadlineInstant(LocalDate deadlineDate, String deadlineTime) {
+        if (deadlineDate == null) {
+            throw new IllegalArgumentException("deadline date is required");
+        }
+        LocalTime time = LocalTime.parse(deadlineTime == null ? "" : deadlineTime.trim());
+        return deadlineDate.atTime(time).atZone(ZoneId.systemDefault()).toInstant().toString();
     }
 
     private TableView<DashboardRow> createTableView() {

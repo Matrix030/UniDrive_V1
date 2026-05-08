@@ -7,6 +7,7 @@ import edu.nyu.unidrive.client.net.AssignmentApiClient;
 import edu.nyu.unidrive.client.net.DownloadedFile;
 import edu.nyu.unidrive.client.net.FeedbackApiClient;
 import edu.nyu.unidrive.client.net.SubmissionApiClient;
+import edu.nyu.unidrive.client.storage.AssignmentDeadlineStore;
 import edu.nyu.unidrive.client.storage.AssignmentSlot;
 import edu.nyu.unidrive.client.storage.ReceivedStateRepository;
 import edu.nyu.unidrive.client.storage.SyncStateRepository;
@@ -43,6 +44,7 @@ class CurrentFolderWorkflowIntegrationTest {
         CoursePath coursePath = new CoursePath(MockCourseRegistry.CURRENT_TERM, "daa", "hashing");
 
         AssignmentSlot instructorSlot = WorkspaceLayout.ensureAssignmentSlot(instructorRoot, coursePath, WorkspaceRole.INSTRUCTOR);
+        AssignmentDeadlineStore.writeDeadline(instructorRoot, coursePath, "2099-12-31T23:59:00Z");
         Path instructorSpec = instructorSlot.publishDir().resolve("hashing_assignment.md");
         Files.writeString(instructorSpec, "Implement a hash table.");
 
@@ -51,7 +53,7 @@ class CurrentFolderWorkflowIntegrationTest {
         try {
             new PublishSyncService(
                 publishWatcher,
-                new PublishUploadService(server),
+                new PublishUploadService(server, instructorRoot),
                 instructorSyncRepository,
                 instructorRoot,
                 Duration.ZERO
@@ -155,7 +157,7 @@ class CurrentFolderWorkflowIntegrationTest {
         }
 
         @Override
-        public AssignmentSummaryResponse publishAssignment(CoursePath coursePath, String title, Path file) throws IOException {
+        public AssignmentSummaryResponse publishAssignment(CoursePath coursePath, String title, String deadline, Path file) throws IOException {
             byte[] content = Files.readAllBytes(file);
             String fileName = file.getFileName().toString();
             String sha256 = FileHasher.sha256Hex(content);
@@ -165,7 +167,8 @@ class CurrentFolderWorkflowIntegrationTest {
                 coursePath.courseSlug(),
                 title,
                 fileName,
-                sha256
+                sha256,
+                deadline
             );
             assignments.put(coursePath.assignmentId() + "/" + fileName, new StoredAssignment(coursePath, summary, content));
             return summary;

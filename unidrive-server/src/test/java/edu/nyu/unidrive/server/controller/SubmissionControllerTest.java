@@ -38,6 +38,8 @@ class SubmissionControllerTest {
     private static final Path STORAGE_ROOT = Path.of("target/test-storage");
     private static final String TERM = "fall2026";
     private static final String COURSE = "daa";
+    private static final long FUTURE_DEADLINE = 4102444740000L;
+    private static final long PAST_DEADLINE = 946684800000L;
 
     @Autowired
     private MockMvc mockMvc;
@@ -50,11 +52,13 @@ class SubmissionControllerTest {
         FileSystemUtils.deleteRecursively(STORAGE_ROOT);
         Files.createDirectories(STORAGE_ROOT);
         jdbcTemplate.execute("DELETE FROM submissions");
+        jdbcTemplate.execute("DELETE FROM assignments");
     }
 
     @Test
     void uploadSubmissionStoresFileAndReturnsReceiptWhenHashMatches() throws Exception {
         byte[] content = "public class Hello { }".getBytes();
+        ensureAssignment(TERM, COURSE, "assignment-1", FUTURE_DEADLINE);
         String sha256 = FileHasher.sha256Hex(content);
         Integer submissionCountBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM submissions", Integer.class);
         int beforeCount = submissionCountBefore == null ? 0 : submissionCountBefore;
@@ -109,6 +113,7 @@ class SubmissionControllerTest {
     @Test
     void uploadSubmissionRejectsHashMismatchAndDoesNotStoreFile() throws Exception {
         byte[] content = "class BrokenHash { }".getBytes();
+        ensureAssignment(TERM, COURSE, "assignment-1", FUTURE_DEADLINE);
         Integer submissionCountBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM submissions", Integer.class);
         int beforeCount = submissionCountBefore == null ? 0 : submissionCountBefore;
         MockMultipartFile file = new MockMultipartFile(
@@ -136,6 +141,51 @@ class SubmissionControllerTest {
         Integer submissionCountAfter = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM submissions", Integer.class);
         int afterCount = submissionCountAfter == null ? 0 : submissionCountAfter;
         org.junit.jupiter.api.Assertions.assertEquals(beforeCount, afterCount);
+    }
+
+    @Test
+    void uploadSubmissionRejectsMissingAssignment() throws Exception {
+        byte[] content = "class MissingAssignment { }".getBytes();
+        String sha256 = FileHasher.sha256Hex(content);
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "MissingAssignment.java",
+            MediaType.TEXT_PLAIN_VALUE,
+            content
+        );
+
+        mockMvc.perform(
+                multipart("/api/v1/submissions/{term}/{course}/{assignmentId}", TERM, COURSE, "missing-assignment")
+                    .file(file)
+                    .param("studentId", "rvg9395")
+                    .header("X-File-Sha256", sha256)
+            )
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.status").value("error"))
+            .andExpect(jsonPath("$.message").value("Assignment was not found."));
+    }
+
+    @Test
+    void uploadSubmissionRejectsPastDeadline() throws Exception {
+        byte[] content = "class Late { }".getBytes();
+        ensureAssignment(TERM, COURSE, "assignment-1", PAST_DEADLINE);
+        String sha256 = FileHasher.sha256Hex(content);
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "Late.java",
+            MediaType.TEXT_PLAIN_VALUE,
+            content
+        );
+
+        mockMvc.perform(
+                multipart("/api/v1/submissions/{term}/{course}/{assignmentId}", TERM, COURSE, "assignment-1")
+                    .file(file)
+                    .param("studentId", "rvg9395")
+                    .header("X-File-Sha256", sha256)
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.status").value("error"))
+            .andExpect(jsonPath("$.message").value("Assignment deadline has passed."));
     }
 
     @Test
@@ -207,6 +257,25 @@ class SubmissionControllerTest {
             .andExpect(status().isNotFound());
     }
 
+    @Test
+    void deleteSubmissionRejectsPastDeadline() throws Exception {
+        uploadSubmission(TERM, COURSE, "assignment-1", "rvg9395", "Solution.java", "class Solution { }".getBytes());
+        String submissionId = jdbcTemplate.queryForObject(
+            "SELECT id FROM submissions WHERE assignment_id = ? AND student_id = ? ORDER BY submitted_at DESC LIMIT 1",
+            String.class,
+            "assignment-1",
+            "rvg9395"
+        );
+        jdbcTemplate.update("UPDATE assignments SET deadline = ? WHERE id = ?", PAST_DEADLINE, "assignment-1");
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/submissions/{submissionId}", submissionId))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.status").value("error"))
+            .andExpect(jsonPath("$.message").value("Assignment deadline has passed."));
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM submissions", Integer.class));
+    }
+
     private void uploadSubmission(
         String term,
         String course,
@@ -215,6 +284,7 @@ class SubmissionControllerTest {
         String fileName,
         byte[] content
     ) throws Exception {
+        ensureAssignment(term, course, assignmentId, FUTURE_DEADLINE);
         String sha256 = FileHasher.sha256Hex(content);
         MockMultipartFile file = new MockMultipartFile(
             "file",
@@ -230,5 +300,23 @@ class SubmissionControllerTest {
                     .header("X-File-Sha256", sha256)
             )
             .andExpect(status().isOk());
+    }
+
+    private void ensureAssignment(String term, String course, String assignmentId, long deadline) {
+        jdbcTemplate.update(
+            """
+            INSERT OR IGNORE INTO assignments (id, file_name, term, course, title, deadline, published_at, file_path, hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            assignmentId,
+            "spec.md",
+            term,
+            course,
+            "Assignment",
+            deadline,
+            System.currentTimeMillis(),
+            STORAGE_ROOT.resolve(term).resolve(course).resolve(assignmentId).resolve("publish/spec.md").toString(),
+            "assignment-hash"
+        );
     }
 }

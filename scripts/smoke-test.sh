@@ -15,6 +15,8 @@ TERM="fall2026"
 COURSE="daa"
 ASSIGNMENT_ID="smoke-hashing"
 STUDENT_ID="rvg9395"
+FUTURE_DEADLINE="2099-12-31T23:59:00Z"
+PAST_DEADLINE="2000-01-01T00:00:00Z"
 
 log() {
     printf '[smoke] %s\n' "$1"
@@ -246,8 +248,9 @@ smoke_assignments() {
 
     request "publish assignment" 200 POST "/api/v1/instructor/assignments/$TERM/$COURSE/$ASSIGNMENT_ID" \
         -F 'title=Smoke Hashing Assignment' \
+        -F "deadline=$FUTURE_DEADLINE" \
         -F "file=@$assignment_file;filename=hashing_assignment.txt"
-    assert_json --arg sha "$assignment_sha" '.status == "ok" and .data.assignmentId == "smoke-hashing" and .data.term == "fall2026" and .data.course == "daa" and .data.fileName == "hashing_assignment.txt" and .data.sha256 == $sha' \
+    assert_json --arg sha "$assignment_sha" --arg deadline "$FUTURE_DEADLINE" '.status == "ok" and .data.assignmentId == "smoke-hashing" and .data.term == "fall2026" and .data.course == "daa" and .data.fileName == "hashing_assignment.txt" and .data.sha256 == $sha and .data.deadline == $deadline' \
         "published assignment response matches upload"
 
     request "list assignments" 200 GET "/api/v1/assignments?term=$TERM&course=$COURSE"
@@ -296,6 +299,17 @@ smoke_submissions_and_feedback() {
         -F "file=@$SMOKE_DIR/files/bad-hash.txt;filename=bad-hash.txt"
     assert_json '.status == "error"' "bad submission sha returns error payload"
 
+    request "late assignment publish" 200 POST "/api/v1/instructor/assignments/$TERM/$COURSE/smoke-late" \
+        -F 'title=Smoke Late Assignment' \
+        -F "deadline=$PAST_DEADLINE" \
+        -F "file=@$SMOKE_DIR/files/hashing_assignment.txt;filename=late_assignment.txt"
+
+    request "late submission rejected" 409 POST "/api/v1/submissions/$TERM/$COURSE/smoke-late" \
+        -H "X-File-Sha256: $submission_sha" \
+        -F "studentId=$STUDENT_ID" \
+        -F "file=@$submission_file;filename=Solution.java"
+    assert_json '.status == "error" and .message == "Assignment deadline has passed."' "late submission returns deadline error"
+
     download "missing submission download" 404 "/api/v1/submissions/missing/download" "$SMOKE_DIR/downloads/missing_submission.txt"
 
     local feedback_file="$SMOKE_DIR/files/feedback.txt"
@@ -324,6 +338,9 @@ smoke_submissions_and_feedback() {
 
     request "delete submission" 200 DELETE "/api/v1/submissions/$submission_id"
     assert_json '.status == "ok"' "delete submission returns success payload"
+
+    request "delete late assignment" 200 DELETE "/api/v1/instructor/assignments/smoke-late?fileName=late_assignment.txt"
+    assert_json '.status == "ok"' "delete late assignment returns success payload"
 
     request "missing submission delete" 404 DELETE "/api/v1/submissions/missing"
 }

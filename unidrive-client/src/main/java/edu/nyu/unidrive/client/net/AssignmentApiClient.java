@@ -12,7 +12,7 @@ public interface AssignmentApiClient {
 
     DownloadedFile downloadAssignment(String assignmentId, String fileName) throws IOException;
 
-    AssignmentSummaryResponse publishAssignment(CoursePath coursePath, String title, Path file) throws IOException;
+    AssignmentSummaryResponse publishAssignment(CoursePath coursePath, String title, String deadline, Path file) throws IOException;
 
     void deleteAssignment(String assignmentId, String fileName) throws IOException;
 }

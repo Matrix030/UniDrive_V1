@@ -27,11 +27,18 @@ public final class AssignmentSchemaMigrator implements ApplicationRunner {
     }
 
     public void migrate() {
-        if (!tableExists("assignments") || columnExists("assignments", "file_name")) {
+        if (!tableExists("assignments")) {
             return;
         }
 
-        transactionTemplate.executeWithoutResult(status -> rebuildLegacyAssignmentsTable());
+        if (!columnExists("assignments", "file_name")) {
+            transactionTemplate.executeWithoutResult(status -> rebuildLegacyAssignmentsTable());
+            return;
+        }
+
+        if (!columnExists("assignments", "deadline")) {
+            jdbcTemplate.execute("ALTER TABLE assignments ADD COLUMN deadline INTEGER");
+        }
     }
 
     private void rebuildLegacyAssignmentsTable() {
@@ -47,6 +54,7 @@ public final class AssignmentSchemaMigrator implements ApplicationRunner {
                 term TEXT,
                 course TEXT,
                 title TEXT,
+                deadline INTEGER,
                 published_at INTEGER,
                 file_path TEXT,
                 hash TEXT,
@@ -60,14 +68,15 @@ public final class AssignmentSchemaMigrator implements ApplicationRunner {
             jdbcTemplate.update(
                 """
                     INSERT OR REPLACE INTO assignments_migration
-                    (id, file_name, term, course, title, published_at, file_path, hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, file_name, term, course, title, deadline, published_at, file_path, hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                 assignmentId,
                 deriveFileName(filePath, assignmentId),
                 row.get("term"),
                 row.get("course"),
                 row.get("title"),
+                null,
                 row.get("published_at"),
                 filePath,
                 row.get("hash")

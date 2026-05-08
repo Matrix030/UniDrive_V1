@@ -1,6 +1,7 @@
 package edu.nyu.unidrive.client.sync;
 
 import edu.nyu.unidrive.client.net.AssignmentApiClient;
+import edu.nyu.unidrive.client.storage.AssignmentDeadlineStore;
 import edu.nyu.unidrive.common.dto.AssignmentSummaryResponse;
 import edu.nyu.unidrive.common.workspace.CoursePath;
 import java.io.IOException;
@@ -9,15 +10,19 @@ import java.nio.file.Path;
 public final class PublishUploadService {
 
     private final AssignmentApiClient assignmentApiClient;
+    private final Path workspaceRoot;
 
-    public PublishUploadService(AssignmentApiClient assignmentApiClient) {
+    public PublishUploadService(AssignmentApiClient assignmentApiClient, Path workspaceRoot) {
         this.assignmentApiClient = assignmentApiClient;
+        this.workspaceRoot = workspaceRoot;
     }
 
     public AssignmentSummaryResponse publish(CoursePath coursePath, Path file) throws IOException {
         String fileName = file.getFileName().toString();
         String title = stripExtension(fileName);
-        return assignmentApiClient.publishAssignment(coursePath, title, file);
+        String deadline = AssignmentDeadlineStore.readDeadline(workspaceRoot, coursePath)
+            .orElseThrow(() -> new IOException("Create the assignment slot with a deadline before publishing files."));
+        return assignmentApiClient.publishAssignment(coursePath, title, deadline, file);
     }
 
     public void delete(CoursePath coursePath, Path file) throws IOException {

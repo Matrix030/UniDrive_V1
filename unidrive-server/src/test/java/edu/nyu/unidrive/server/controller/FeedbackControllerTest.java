@@ -50,6 +50,7 @@ class FeedbackControllerTest {
         Files.createDirectories(STORAGE_ROOT);
         jdbcTemplate.execute("DELETE FROM feedback");
         jdbcTemplate.execute("DELETE FROM submissions");
+        jdbcTemplate.execute("DELETE FROM assignments");
     }
 
     @Test
@@ -179,6 +180,21 @@ class FeedbackControllerTest {
     }
 
     private String createSubmission(String assignmentId, String studentId, String fileName, byte[] content) throws Exception {
+        jdbcTemplate.update(
+            """
+            INSERT OR IGNORE INTO assignments (id, file_name, term, course, title, deadline, published_at, file_path, hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            assignmentId,
+            "spec.md",
+            "fall2026",
+            "daa",
+            "Assignment",
+            4102444740000L,
+            System.currentTimeMillis(),
+            STORAGE_ROOT.resolve("fall2026/daa/" + assignmentId + "/publish/spec.md").toString(),
+            "assignment-hash"
+        );
         String sha256 = FileHasher.sha256Hex(content);
         MockMultipartFile file = new MockMultipartFile("file", fileName, MediaType.TEXT_PLAIN_VALUE, content);
 

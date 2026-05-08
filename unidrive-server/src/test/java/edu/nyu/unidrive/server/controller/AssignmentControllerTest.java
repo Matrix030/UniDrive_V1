@@ -41,6 +41,7 @@ class AssignmentControllerTest {
     private static final Path STORAGE_ROOT = Path.of("target/test-assignment-storage");
     private static final String TERM = "fall2026";
     private static final String COURSE = "daa";
+    private static final String FUTURE_DEADLINE = "2099-12-31T23:59:00Z";
 
     @Autowired
     private MockMvc mockMvc;
@@ -66,6 +67,7 @@ class AssignmentControllerTest {
                 multipart("/api/v1/instructor/assignments/{term}/{course}/{assignmentId}", TERM, COURSE, assignmentId)
                     .file(file)
                     .param("title", "Assignment 1")
+                    .param("deadline", FUTURE_DEADLINE)
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("ok"))
@@ -75,15 +77,17 @@ class AssignmentControllerTest {
             .andExpect(jsonPath("$.data.course").value(COURSE))
             .andExpect(jsonPath("$.data.title").value("Assignment 1"))
             .andExpect(jsonPath("$.data.fileName").value("Assignment1.txt"))
-            .andExpect(jsonPath("$.data.sha256").value(sha256));
+            .andExpect(jsonPath("$.data.sha256").value(sha256))
+            .andExpect(jsonPath("$.data.deadline").value(FUTURE_DEADLINE));
 
         Map<String, Object> saved = jdbcTemplate.queryForMap(
-            "SELECT term, course, title, hash FROM assignments WHERE id = ?",
+            "SELECT term, course, title, deadline, hash FROM assignments WHERE id = ?",
             assignmentId
         );
         org.junit.jupiter.api.Assertions.assertEquals(TERM, saved.get("term"));
         org.junit.jupiter.api.Assertions.assertEquals(COURSE, saved.get("course"));
         org.junit.jupiter.api.Assertions.assertEquals("Assignment 1", saved.get("title"));
+        org.junit.jupiter.api.Assertions.assertEquals(4102444740000L, ((Number) saved.get("deadline")).longValue());
         org.junit.jupiter.api.Assertions.assertEquals(sha256, saved.get("hash"));
 
         try (Stream<Path> storedFiles = Files.walk(STORAGE_ROOT)) {
@@ -107,11 +111,27 @@ class AssignmentControllerTest {
                 multipart("/api/v1/instructor/assignments/{term}/{course}/{assignmentId}", TERM, COURSE, "big-1")
                     .file(file)
                     .param("title", "Big Assignment")
+                    .param("deadline", FUTURE_DEADLINE)
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("ok"))
             .andExpect(jsonPath("$.data.fileName").value("BigAssignment.txt"))
             .andExpect(jsonPath("$.data.sha256").value(sha256));
+    }
+
+    @Test
+    void publishAssignmentRejectsInvalidDeadline() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "Assignment1.txt", MediaType.TEXT_PLAIN_VALUE, "content".getBytes());
+
+        mockMvc.perform(
+                multipart("/api/v1/instructor/assignments/{term}/{course}/{assignmentId}", TERM, COURSE, "hw1")
+                    .file(file)
+                    .param("title", "Assignment 1")
+                    .param("deadline", "tomorrow")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.status").value("error"))
+            .andExpect(jsonPath("$.message").value("Assignment deadline must be an ISO-8601 UTC instant."));
     }
 
     @Test
@@ -168,6 +188,7 @@ class AssignmentControllerTest {
                 multipart("/api/v1/instructor/assignments/{term}/{course}/{assignmentId}", term, course, assignmentId)
                     .file(file)
                     .param("title", title)
+                    .param("deadline", FUTURE_DEADLINE)
             )
             .andExpect(status().isOk());
     }

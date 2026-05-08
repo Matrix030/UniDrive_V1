@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS assignments (
     term TEXT,
     course TEXT,
     title TEXT,
+    deadline INTEGER,
     published_at INTEGER,
     file_path TEXT,
     hash TEXT,
