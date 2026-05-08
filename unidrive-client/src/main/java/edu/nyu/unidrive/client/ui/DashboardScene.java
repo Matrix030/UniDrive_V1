@@ -257,18 +257,15 @@ public final class DashboardScene {
                 return;
             }
             tableView.setItems(FXCollections.observableArrayList(mapSnapshotRows(latestSnapshot.rows())));
+        } else if (session.role() == UserRole.STUDENT) {
+            tableView.setItems(FXCollections.observableArrayList(loadReceivedRows(
+                ReceivedReconcileService.SOURCE_ASSIGNMENTS,
+                ReceivedReconcileService.SOURCE_FEEDBACK
+            )));
         } else {
-            String source = session.role() == UserRole.STUDENT
-                ? ReceivedReconcileService.SOURCE_ASSIGNMENTS
-                : ReceivedReconcileService.SOURCE_INSTRUCTOR_SUBMISSIONS;
-            if (session.role() == UserRole.STUDENT) {
-                tableView.setItems(FXCollections.observableArrayList(loadReceivedRows(
-                    ReceivedReconcileService.SOURCE_ASSIGNMENTS,
-                    ReceivedReconcileService.SOURCE_FEEDBACK
-                )));
-            } else {
-                tableView.setItems(FXCollections.observableArrayList(loadReceivedRows(source)));
-            }
+            tableView.setItems(FXCollections.observableArrayList(loadReceivedRows(
+                ReceivedReconcileService.SOURCE_INSTRUCTOR_SUBMISSIONS
+            )));
         }
     }
 

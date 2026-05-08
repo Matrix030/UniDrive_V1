@@ -3,6 +3,7 @@ package edu.nyu.unidrive.server.controller;
 import edu.nyu.unidrive.common.dto.ApiResponse;
 import edu.nyu.unidrive.common.dto.FeedbackSummaryResponse;
 import edu.nyu.unidrive.server.service.FeedbackService;
+import java.io.IOException;
 import java.util.List;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
@@ -57,7 +58,7 @@ public class FeedbackController {
     }
 
     @DeleteMapping("/api/v1/feedback/{feedbackId}")
-    public ResponseEntity<ApiResponse<Void>> deleteFeedback(@PathVariable("feedbackId") String feedbackId) throws Exception {
+    public ResponseEntity<ApiResponse<Void>> deleteFeedback(@PathVariable("feedbackId") String feedbackId) throws IOException {
         try {
             feedbackService.deleteFeedback(feedbackId);
             return ResponseEntity.ok(ApiResponse.ok(null, "Feedback deleted successfully."));

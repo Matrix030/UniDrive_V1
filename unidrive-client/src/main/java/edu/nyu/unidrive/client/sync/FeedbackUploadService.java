@@ -12,6 +12,9 @@ import edu.nyu.unidrive.common.workspace.CoursePath.Leaf;
 import edu.nyu.unidrive.common.workspace.CoursePath.ParsedLocation;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public final class FeedbackUploadService {
@@ -20,6 +23,7 @@ public final class FeedbackUploadService {
     private final FeedbackApiClient feedbackApiClient;
     private final SubmissionApiClient submissionApiClient;
     private final Path workspaceRoot;
+    private final Map<CoursePath, List<SubmissionSummaryResponse>> submissionCache = new HashMap<>();
 
     public FeedbackUploadService(
         SyncStateRepository syncStateRepository,
@@ -102,8 +106,17 @@ public final class FeedbackUploadService {
         }
     }
 
+    public void resetSubmissionCache() {
+        submissionCache.clear();
+    }
+
     private String latestSubmissionId(CoursePath coursePath, String studentId) throws IOException {
-        return submissionApiClient.listSubmissions(coursePath).stream()
+        List<SubmissionSummaryResponse> submissions = submissionCache.get(coursePath);
+        if (submissions == null) {
+            submissions = submissionApiClient.listSubmissions(coursePath);
+            submissionCache.put(coursePath, submissions);
+        }
+        return submissions.stream()
             .filter(submission -> studentId.equals(submission.getStudentId()))
             .map(SubmissionSummaryResponse::getSubmissionId)
             .findFirst()

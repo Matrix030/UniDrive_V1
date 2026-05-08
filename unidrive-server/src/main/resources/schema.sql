@@ -1,3 +1,7 @@
+-- Schema for fresh databases. UserRepository.initializeSchema() and
+-- FeedbackRepository.initializeSchema() perform live ALTER TABLE migrations
+-- for existing databases; keep both in sync when adding columns here.
+
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     name TEXT,

@@ -18,7 +18,6 @@ public final class ReceivedReconcileService {
     public static final String SOURCE_ASSIGNMENTS = "ASSIGNMENTS";
     public static final String SOURCE_FEEDBACK = "FEEDBACK";
     public static final String SOURCE_INSTRUCTOR_SUBMISSIONS = "INSTRUCTOR_SUBMISSIONS";
-    public static final String SOURCE_INSTRUCTOR_FEEDBACKS = "INSTRUCTOR_FEEDBACKS";
 
     private final ReceivedStateRepository receivedStateRepository;
 
@@ -49,9 +48,7 @@ public final class ReceivedReconcileService {
             source = SOURCE_ASSIGNMENTS;
         } else if (location.leaf() == Leaf.SUBMISSIONS && location.studentId().isPresent()) {
             source = SOURCE_INSTRUCTOR_SUBMISSIONS;
-        } else if (location.leaf() == Leaf.FEEDBACK && location.studentId().isPresent()) {
-            source = SOURCE_INSTRUCTOR_FEEDBACKS;
-        } else if (location.leaf() == Leaf.FEEDBACK) {
+        } else if (location.leaf() == Leaf.FEEDBACK && location.studentId().isEmpty()) {
             source = SOURCE_FEEDBACK;
         } else {
             return;

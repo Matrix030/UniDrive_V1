@@ -48,7 +48,10 @@ public final class LoginScene {
                 LoginResponse response = authApiClient.login(email, password);
                 onSuccess.onLogin(response.userId(), UserRole.valueOf(response.role()));
             } catch (IOException | RuntimeException exception) {
-                statusLabel.setText("Login failed: " + exception.getMessage());
+                String message = exception.getMessage();
+                statusLabel.setText(message == null || message.isBlank()
+                    ? "Login failed. Please try again."
+                    : message);
             }
         });
 

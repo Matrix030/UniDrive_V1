@@ -49,6 +49,7 @@ public final class InstructorFeedbackSyncService implements SyncServiceHandle {
     }
 
     public void processOnce() {
+        uploadService.resetSubmissionCache();
         for (SubmissionFileEvent event : watcher.pollEvents(pollTimeout)) {
             if (event.type() == SubmissionFileEventType.DELETED) {
                 uploadService.deleteFeedback(event.path());

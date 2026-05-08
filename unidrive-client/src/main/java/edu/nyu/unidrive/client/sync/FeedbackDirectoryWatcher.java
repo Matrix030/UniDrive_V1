@@ -91,7 +91,8 @@ public final class FeedbackDirectoryWatcher implements Closeable {
 
             SubmissionFileEventType newType = mapEventType(event.kind());
             SubmissionFileEventType existingType = eventTypesByPath.get(absolutePath);
-            if (existingType == SubmissionFileEventType.CREATED || newType == SubmissionFileEventType.MODIFIED && existingType != null) {
+            if (existingType == SubmissionFileEventType.CREATED
+                || (newType == SubmissionFileEventType.MODIFIED && existingType != null)) {
                 continue;
             }
             eventTypesByPath.put(absolutePath, newType);
