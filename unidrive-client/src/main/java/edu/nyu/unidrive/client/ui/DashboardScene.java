@@ -38,6 +38,7 @@ import javafx.collections.FXCollections;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.DateCell;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
@@ -189,6 +190,13 @@ public final class DashboardScene {
 
         DatePicker deadlineDatePicker = new DatePicker(LocalDate.now().plusDays(7));
         deadlineDatePicker.setPromptText("deadline date");
+        deadlineDatePicker.setDayCellFactory(picker -> new DateCell() {
+            @Override
+            public void updateItem(LocalDate item, boolean empty) {
+                super.updateItem(item, empty);
+                setDisable(empty || item.isBefore(LocalDate.now()));
+            }
+        });
 
         TextField deadlineTimeField = new TextField("23:59");
         deadlineTimeField.setPromptText("time (HH:mm)");
@@ -219,7 +227,7 @@ public final class DashboardScene {
                 idField.clear();
                 statusLabel.setText("Created " + coursePath.toRelativePath() + " — drop a file into publish/ to publish.");
             } catch (IllegalArgumentException exception) {
-                statusLabel.setText("Choose a deadline date and enter time as HH:mm.");
+                statusLabel.setText(exception.getMessage());
             } catch (Exception exception) {
                 statusLabel.setText("Failed: " + exception.getMessage());
             }
@@ -243,8 +251,15 @@ public final class DashboardScene {
         if (deadlineDate == null) {
             throw new IllegalArgumentException("deadline date is required");
         }
+        if (deadlineDate.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("deadline date cannot be before today");
+        }
         LocalTime time = LocalTime.parse(deadlineTime == null ? "" : deadlineTime.trim());
-        return deadlineDate.atTime(time).atZone(ZoneId.systemDefault()).toInstant().toString();
+        Instant deadlineInstant = deadlineDate.atTime(time).atZone(ZoneId.systemDefault()).toInstant();
+        if (deadlineInstant.isBefore(Instant.now())) {
+            throw new IllegalArgumentException("deadline cannot be before the current time");
+        }
+        return deadlineInstant.toString();
     }
 
     private TableView<DashboardRow> createTableView() {

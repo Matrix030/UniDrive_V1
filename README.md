@@ -42,7 +42,7 @@ The client uses Java `WatchService`, polling services, and background sync loops
 
 ### 4. JavaFX desktop UI
 
-The project includes a role-aware JavaFX interface with login, folder selection, student dashboard, instructor dashboard, status counts, file tables, and a switch-user flow.
+The project includes a role-aware JavaFX interface with login, folder selection, student dashboard, instructor dashboard, assignment deadline controls, status counts, file tables, and a switch-user flow.
 
 ### 5. File integrity verification
 
@@ -72,7 +72,7 @@ The repository includes `scripts/smoke-test.sh`, which builds the project, start
 
 ### Instructor
 
-1. Publish an assignment by dropping files into an assignment's `publish/` folder.
+1. Create an assignment slot with a deadline, then publish assignment files by dropping them into the assignment's `publish/` folder.
 2. Review synced submissions under `submissions/student_<id>/`.
 3. Return feedback by dropping files into `submissions/student_<id>/feedback/`.
 
@@ -245,7 +245,7 @@ Use three terminals so the server, instructor client, and student client all sta
 4. In the instructor client, log in with `instructor@nyu.edu` / `password123` and choose an instructor workspace folder.
 5. In the student client, log in with `student@nyu.edu` / `password123` and choose a different student workspace folder.
 6. In the instructor dashboard, create an assignment slot for a course and assignment id.
-7. Choose the assignment deadline with the calendar control and enter the time of day as `HH:mm`.
+7. Choose the assignment deadline with the calendar control and enter the time of day as `HH:mm`. The instructor UI disables previous dates and rejects any deadline before the current time.
 8. Drop or update an assignment file in the instructor workspace under `<term>/<course>/<assignment>/publish/`.
 9. Watch the student workspace: the file should sync into `<term>/<course>/<assignment>/files/`.
 10. Drop or update a student solution file in the student workspace under `<term>/<course>/<assignment>/submission/`.
