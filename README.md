@@ -4,6 +4,10 @@ University Drive is a folder-based assignment sync system for an Intro to Java c
 
 This README is the final project report. It includes setup instructions, demo credentials, verification steps, and the advanced topics used in the project.
 
+## Demo Video
+
+A recorded walkthrough of the project is available here: https://drive.google.com/file/d/1p2lP5_ZpZh8nIy52EL2b8zMBugQfu6xl/view?usp=sharing
+
 ## API Key Requirement
 
 No external API key is required for this project. Authentication is implemented as a mocked SSO-style login module for the course project, so the first screen asks for an email and password instead of an API key. Demo passwords are verified against salted PBKDF2-SHA256 hashes, and the server stores only `password_hash` values in SQLite.
