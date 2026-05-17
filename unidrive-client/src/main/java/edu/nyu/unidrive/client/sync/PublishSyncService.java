@@ -24,6 +24,9 @@ public final class PublishSyncService implements SyncServiceHandle {
     private final Duration pollTimeout;
     private Thread workerThread;
 
+    private static final int RECONCILE_SWEEP_EVERY_N_ITERATIONS = 20;
+    private int loopIteration = 0;
+
     public PublishSyncService(
         PublishDirectoryWatcher watcher,
         PublishUploadService uploadService,
@@ -50,6 +53,10 @@ public final class PublishSyncService implements SyncServiceHandle {
 
     public void processOnce() {
         for (SubmissionFileEvent event : watcher.pollEvents(pollTimeout)) {
+            if (event.type() == SubmissionFileEventType.OVERFLOW) {
+                reconcilePublishSubtree(event.path());
+                continue;
+            }
             if (event.type() == SubmissionFileEventType.DELETED) {
                 tryDelete(event.path());
             } else {
@@ -57,8 +64,25 @@ public final class PublishSyncService implements SyncServiceHandle {
             }
         }
 
+        if (loopIteration++ % RECONCILE_SWEEP_EVERY_N_ITERATIONS != 0) {
+            return;
+        }
         reconcileDeletedPublishFiles();
-        reconcileExistingPublishFiles();
+    }
+
+    private void reconcilePublishSubtree(Path subtree) {
+        if (!Files.isDirectory(subtree)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(subtree)) {
+            paths.filter(Files::isRegularFile)
+                .filter(path -> CoursePath.parseFromWorkspace(workspaceRoot, path)
+                    .map(parsed -> parsed.leaf() == Leaf.PUBLISH)
+                    .orElse(false))
+                .forEach(this::tryPublish);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to reconcile publish subtree: " + subtree, exception);
+        }
     }
 
     private void tryPublish(Path path) {
@@ -162,13 +186,17 @@ public final class PublishSyncService implements SyncServiceHandle {
         }
     }
 
-    private void runLoop() {
+    public void runStartupReconcile() {
         try {
             reconcileDeletedPublishFiles();
             reconcileExistingPublishFiles();
         } catch (RuntimeException exception) {
             System.err.println("Publish reconcile failed: " + exception);
         }
+    }
+
+    private void runLoop() {
+        runStartupReconcile();
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 processOnce();

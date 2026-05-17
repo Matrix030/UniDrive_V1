@@ -20,16 +20,20 @@ public final class FeedbackReconcileService {
     }
 
     public void reconcileExistingFeedback(Path workspaceRoot) {
-        if (!Files.isDirectory(workspaceRoot)) {
+        reconcileSubtree(workspaceRoot, workspaceRoot);
+    }
+
+    public void reconcileSubtree(Path workspaceRoot, Path subtree) {
+        if (!Files.isDirectory(subtree)) {
             return;
         }
-        try (Stream<Path> paths = Files.walk(workspaceRoot)) {
+        try (Stream<Path> paths = Files.walk(subtree)) {
             paths.filter(Files::isRegularFile)
                 .filter(path -> isInstructorFeedbackFile(workspaceRoot, path))
                 .filter(path -> !isIgnoredFile(path))
                 .forEach(path -> reconcileFile(path));
         } catch (IOException exception) {
-            throw new IllegalStateException("Failed to reconcile feedback in workspace: " + workspaceRoot, exception);
+            throw new IllegalStateException("Failed to reconcile feedback in subtree: " + subtree, exception);
         }
     }
 

@@ -22,6 +22,9 @@ public final class InstructorFeedbackSyncService implements SyncServiceHandle {
     private final Duration pollTimeout;
     private Thread workerThread;
 
+    private static final int RETRY_SWEEP_EVERY_N_ITERATIONS = 20;
+    private int loopIteration = 0;
+
     public InstructorFeedbackSyncService(
         FeedbackDirectoryWatcher watcher,
         FeedbackUploadService uploadService,
@@ -51,6 +54,10 @@ public final class InstructorFeedbackSyncService implements SyncServiceHandle {
     public void processOnce() {
         uploadService.resetSubmissionCache();
         for (SubmissionFileEvent event : watcher.pollEvents(pollTimeout)) {
+            if (event.type() == SubmissionFileEventType.OVERFLOW) {
+                reconcileService.reconcileSubtree(workspaceRoot, event.path());
+                continue;
+            }
             if (event.type() == SubmissionFileEventType.DELETED) {
                 uploadService.deleteFeedback(event.path());
             } else if (!isIgnoredFeedbackFile(event.path())) {
@@ -59,7 +66,9 @@ public final class InstructorFeedbackSyncService implements SyncServiceHandle {
             }
         }
 
-        reconcileService.reconcileExistingFeedback(workspaceRoot);
+        if (loopIteration++ % RETRY_SWEEP_EVERY_N_ITERATIONS != 0) {
+            return;
+        }
         for (SyncStateRecord row : syncStateRepository.findAll()) {
             if (!isInstructorFeedbackPath(row.localPath())) {
                 continue;
@@ -97,12 +106,16 @@ public final class InstructorFeedbackSyncService implements SyncServiceHandle {
         }
     }
 
-    private void runLoop() {
+    public void runStartupReconcile() {
         try {
             reconcileService.reconcileExistingFeedback(workspaceRoot);
         } catch (RuntimeException exception) {
             System.err.println("Feedback reconcile failed: " + exception);
         }
+    }
+
+    private void runLoop() {
+        runStartupReconcile();
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 processOnce();

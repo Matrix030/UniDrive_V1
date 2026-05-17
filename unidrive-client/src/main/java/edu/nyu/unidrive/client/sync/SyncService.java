@@ -27,6 +27,9 @@ public final class SyncService implements SyncServiceHandle {
     private final Map<Path, RetryState> retryStateByPath = new ConcurrentHashMap<>();
     private final Map<Path, Boolean> inFlight = new ConcurrentHashMap<>();
 
+    private static final int RETRY_SWEEP_EVERY_N_ITERATIONS = 20;
+    private int loopIteration = 0;
+
     private Thread workerThread;
 
     public SyncService(
@@ -62,6 +65,10 @@ public final class SyncService implements SyncServiceHandle {
 
     public void processOnce() {
         for (SubmissionFileEvent event : eventSource.pollEvents(pollTimeout)) {
+            if (event.type() == SubmissionFileEventType.OVERFLOW) {
+                reconcileService.reconcileSubtree(workspaceRoot, event.path());
+                continue;
+            }
             if (event.type() == SubmissionFileEventType.DELETED) {
                 uploadService.deleteSubmission(event.path());
                 continue;
@@ -70,7 +77,9 @@ public final class SyncService implements SyncServiceHandle {
             submitUploadIfAllowed(event.path(), false);
         }
 
-        reconcileService.reconcileExistingSubmissions(workspaceRoot);
+        if (loopIteration++ % RETRY_SWEEP_EVERY_N_ITERATIONS != 0) {
+            return;
+        }
         for (SyncStateRecord row : syncStateRepository.findAll()) {
             if (!Files.exists(row.localPath())) {
                 uploadService.deleteSubmission(row.localPath());
@@ -115,8 +124,12 @@ public final class SyncService implements SyncServiceHandle {
         }
     }
 
-    private void runLoop() {
+    public void runStartupReconcile() {
         reconcileService.reconcileExistingSubmissions(workspaceRoot);
+    }
+
+    private void runLoop() {
+        runStartupReconcile();
 
         while (!Thread.currentThread().isInterrupted()) {
             processOnce();

@@ -94,14 +94,16 @@ class FeedbackSyncServiceTest {
 
         FeedbackDirectoryWatcher watcher = new FeedbackDirectoryWatcher(workspaceRoot);
         try {
-            new InstructorFeedbackSyncService(
+            InstructorFeedbackSyncService service = new InstructorFeedbackSyncService(
                 watcher,
                 new FeedbackUploadService(repository, apiClient, submissionApiClient, workspaceRoot),
                 new FeedbackReconcileService(repository),
                 repository,
                 workspaceRoot,
                 Duration.ZERO
-            ).processOnce();
+            );
+            service.runStartupReconcile();
+            service.processOnce();
         } finally {
             watcher.close();
         }

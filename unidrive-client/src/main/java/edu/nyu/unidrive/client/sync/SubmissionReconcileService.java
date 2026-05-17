@@ -11,7 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
-public final class SubmissionReconcileService {
+public class SubmissionReconcileService {
 
     private final SyncStateRepository syncStateRepository;
 
@@ -20,10 +20,14 @@ public final class SubmissionReconcileService {
     }
 
     public void reconcileExistingSubmissions(Path workspaceRoot) {
-        if (!Files.isDirectory(workspaceRoot)) {
+        reconcileSubtree(workspaceRoot, workspaceRoot);
+    }
+
+    public void reconcileSubtree(Path workspaceRoot, Path subtree) {
+        if (!Files.isDirectory(subtree)) {
             return;
         }
-        try (Stream<Path> paths = Files.walk(workspaceRoot)) {
+        try (Stream<Path> paths = Files.walk(subtree)) {
             paths.filter(Files::isRegularFile)
                 .filter(path -> CoursePath.parseFromWorkspace(workspaceRoot, path)
                     .map(parsed -> parsed.leaf() == Leaf.SUBMISSIONS)
@@ -49,7 +53,7 @@ public final class SubmissionReconcileService {
                     }
                 });
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to reconcile submissions in workspace: " + workspaceRoot, e);
+            throw new IllegalStateException("Failed to reconcile submissions in subtree: " + subtree, e);
         }
     }
 }

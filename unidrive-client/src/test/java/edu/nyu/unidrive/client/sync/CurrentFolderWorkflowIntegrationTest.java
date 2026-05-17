@@ -51,13 +51,15 @@ class CurrentFolderWorkflowIntegrationTest {
         SyncStateRepository instructorSyncRepository = new SyncStateRepository(instructorDb);
         PublishDirectoryWatcher publishWatcher = new PublishDirectoryWatcher(instructorRoot);
         try {
-            new PublishSyncService(
+            PublishSyncService publishSync = new PublishSyncService(
                 publishWatcher,
                 new PublishUploadService(server, instructorRoot),
                 instructorSyncRepository,
                 instructorRoot,
                 Duration.ZERO
-            ).processOnce();
+            );
+            publishSync.runStartupReconcile();
+            publishSync.processOnce();
         } finally {
             publishWatcher.close();
         }
@@ -89,14 +91,16 @@ class CurrentFolderWorkflowIntegrationTest {
         Files.writeString(instructorFeedback, "Good work. Add tests next time.");
         FeedbackDirectoryWatcher feedbackWatcher = new FeedbackDirectoryWatcher(instructorRoot);
         try {
-            new InstructorFeedbackSyncService(
+            InstructorFeedbackSyncService feedbackSync = new InstructorFeedbackSyncService(
                 feedbackWatcher,
                 new FeedbackUploadService(instructorSyncRepository, server, server, instructorRoot),
                 new FeedbackReconcileService(instructorSyncRepository),
                 instructorSyncRepository,
                 instructorRoot,
                 Duration.ZERO
-            ).processOnce();
+            );
+            feedbackSync.runStartupReconcile();
+            feedbackSync.processOnce();
         } finally {
             feedbackWatcher.close();
         }

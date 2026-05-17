@@ -69,6 +69,8 @@ public final class FeedbackDirectoryWatcher implements Closeable {
         Path watchedDir = watchedDirsByKey.get(watchKey);
         for (WatchEvent<?> event : watchKey.pollEvents()) {
             if (event.kind() == StandardWatchEventKinds.OVERFLOW) {
+                Path overflowSubtree = watchedDir == null ? workspaceRoot : watchedDir;
+                eventTypesByPath.put(overflowSubtree, SubmissionFileEventType.OVERFLOW);
                 continue;
             }
             Path relativePath = (Path) event.context();
