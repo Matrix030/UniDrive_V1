@@ -1,6 +1,6 @@
--- Schema for fresh databases. UserRepository.initializeSchema() and
+-- Schema for fresh databases. AssignmentSchemaMigrator and
 -- FeedbackRepository.initializeSchema() perform live ALTER TABLE migrations
--- for existing databases; keep both in sync when adding columns here.
+-- for existing databases; keep them in sync when adding columns here.
 
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS assignments (
     published_at INTEGER,
     file_path TEXT,
     hash TEXT,
+    version INTEGER NOT NULL DEFAULT 0,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    deleted_at INTEGER,
     PRIMARY KEY (id, file_name)
 );
 
@@ -31,7 +34,10 @@ CREATE TABLE IF NOT EXISTS submissions (
     file_path TEXT,
     hash TEXT,
     submitted_at INTEGER,
-    status TEXT
+    status TEXT,
+    version INTEGER NOT NULL DEFAULT 0,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    deleted_at INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS feedback (
@@ -40,5 +46,17 @@ CREATE TABLE IF NOT EXISTS feedback (
     file_name TEXT,
     file_path TEXT,
     hash TEXT,
-    returned_at INTEGER
+    returned_at INTEGER,
+    version INTEGER NOT NULL DEFAULT 0,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    deleted_at INTEGER
 );
+
+CREATE TABLE IF NOT EXISTS version_counter (
+    table_name TEXT PRIMARY KEY,
+    next_val INTEGER NOT NULL
+);
+
+INSERT OR IGNORE INTO version_counter (table_name, next_val) VALUES ('assignments', 1);
+INSERT OR IGNORE INTO version_counter (table_name, next_val) VALUES ('submissions', 1);
+INSERT OR IGNORE INTO version_counter (table_name, next_val) VALUES ('feedback', 1);

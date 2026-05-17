@@ -50,7 +50,8 @@ class AssignmentSchemaMigratorTest {
         assertTrue(columns.stream().anyMatch(column -> "deadline".equals(column.get("name"))));
         assertEquals("spec.md", jdbcTemplate.queryForObject("SELECT file_name FROM assignments WHERE id = ?", String.class, "hw1"));
 
-        AssignmentRepository repository = new AssignmentRepository(jdbcTemplate);
+        AssignmentRepository repository = new AssignmentRepository(jdbcTemplate,
+            new VersionCounter(jdbcTemplate, new DataSourceTransactionManager(jdbcTemplate.getDataSource())));
         assertEquals("spec.md", repository.findStoredAssignmentByIdAndFileName("hw1", "spec.md").orElseThrow().fileName());
     }
 
@@ -118,6 +119,49 @@ class AssignmentSchemaMigratorTest {
 
         List<Map<String, Object>> columns = jdbcTemplate.queryForList("PRAGMA table_info(assignments)");
         assertTrue(columns.stream().anyMatch(column -> "deadline".equals(column.get("name"))));
+    }
+
+    @Test
+    void migrateBackfillsVersionsAndSeedsVersionCounter(@TempDir Path tempDir) {
+        JdbcTemplate jdbcTemplate = jdbcTemplate(tempDir.resolve("backfill.db"));
+        jdbcTemplate.execute("""
+            CREATE TABLE assignments (
+                id TEXT NOT NULL,
+                file_name TEXT NOT NULL,
+                term TEXT,
+                course TEXT,
+                title TEXT,
+                deadline INTEGER,
+                published_at INTEGER,
+                file_path TEXT,
+                hash TEXT,
+                PRIMARY KEY (id, file_name)
+            )
+            """);
+        for (int i = 0; i < 5; i++) {
+            jdbcTemplate.update(
+                "INSERT INTO assignments (id, file_name, term, course, title, deadline, published_at, file_path, hash) "
+                    + "VALUES (?, ?, 'fall2026', 'daa', ?, NULL, ?, ?, ?)",
+                "hw" + i, "spec.md", "Assignment " + i, (long) i * 1000L,
+                tempDir.resolve("hw" + i).toString(), "hash-" + i);
+        }
+
+        new AssignmentSchemaMigrator(
+            jdbcTemplate,
+            new DataSourceTransactionManager(jdbcTemplate.getDataSource())
+        ).migrate();
+
+        List<Long> versions = jdbcTemplate.queryForList(
+            "SELECT version FROM assignments ORDER BY published_at ASC", Long.class);
+        assertEquals(5, versions.size());
+        for (int i = 0; i < versions.size(); i++) {
+            assertEquals((long) (i + 1), versions.get(i),
+                "versions should be monotonic in published_at order");
+        }
+        long maxVersion = versions.get(versions.size() - 1);
+        Long nextVal = jdbcTemplate.queryForObject(
+            "SELECT next_val FROM version_counter WHERE table_name = 'assignments'", Long.class);
+        assertEquals(maxVersion + 1L, nextVal);
     }
 
     private JdbcTemplate jdbcTemplate(Path databasePath) {

@@ -174,8 +174,12 @@ class FeedbackControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("ok"));
 
-        Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM feedback WHERE id = ?", Integer.class, feedbackId);
-        org.junit.jupiter.api.Assertions.assertEquals(0, count);
+        Integer liveCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM feedback WHERE id = ? AND deleted = 0", Integer.class, feedbackId);
+        org.junit.jupiter.api.Assertions.assertEquals(0, liveCount);
+        Integer tombstoneCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM feedback WHERE id = ? AND deleted = 1", Integer.class, feedbackId);
+        org.junit.jupiter.api.Assertions.assertEquals(1, tombstoneCount);
         org.junit.jupiter.api.Assertions.assertFalse(Files.exists(Path.of(storedPath)));
     }
 

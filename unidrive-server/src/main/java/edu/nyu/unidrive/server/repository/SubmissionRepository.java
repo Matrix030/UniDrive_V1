@@ -1,6 +1,7 @@
 package edu.nyu.unidrive.server.repository;
 
 import edu.nyu.unidrive.common.dto.SubmissionSummaryResponse;
+import edu.nyu.unidrive.server.database.VersionCounter;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -18,9 +19,11 @@ public class SubmissionRepository {
         );
 
     private final JdbcTemplate jdbcTemplate;
+    private final VersionCounter versionCounter;
 
-    public SubmissionRepository(JdbcTemplate jdbcTemplate) {
+    public SubmissionRepository(JdbcTemplate jdbcTemplate, VersionCounter versionCounter) {
         this.jdbcTemplate = jdbcTemplate;
+        this.versionCounter = versionCounter;
     }
 
     public void save(
@@ -34,10 +37,13 @@ public class SubmissionRepository {
         long submittedAt,
         String status
     ) {
+        long version = versionCounter.allocate(VersionCounter.TABLE_SUBMISSIONS);
         jdbcTemplate.update(
             """
-            INSERT INTO submissions (id, term, course, assignment_id, student_id, file_path, hash, submitted_at, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO submissions
+                (id, term, course, assignment_id, student_id, file_path, hash, submitted_at, status,
+                 version, deleted, deleted_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)
             ON CONFLICT(id) DO UPDATE SET
                 term = excluded.term,
                 course = excluded.course,
@@ -46,17 +52,12 @@ public class SubmissionRepository {
                 file_path = excluded.file_path,
                 hash = excluded.hash,
                 submitted_at = excluded.submitted_at,
-                status = excluded.status
+                status = excluded.status,
+                version = excluded.version,
+                deleted = 0,
+                deleted_at = NULL
             """,
-            submissionId,
-            term,
-            course,
-            assignmentId,
-            studentId,
-            filePath,
-            sha256,
-            submittedAt,
-            status
+            submissionId, term, course, assignmentId, studentId, filePath, sha256, submittedAt, status, version
         );
     }
 
@@ -71,13 +72,13 @@ public class SubmissionRepository {
             ? """
             SELECT id, term, course, assignment_id, student_id, file_path, hash, status
             FROM submissions
-            WHERE term = ? AND course = ? AND assignment_id = ? AND student_id = ?
+            WHERE term = ? AND course = ? AND assignment_id = ? AND student_id = ? AND deleted = 0
             ORDER BY submitted_at DESC
             """
             : """
             SELECT id, term, course, assignment_id, student_id, file_path, hash, status
             FROM submissions
-            WHERE term = ? AND course = ? AND assignment_id = ?
+            WHERE term = ? AND course = ? AND assignment_id = ? AND deleted = 0
             ORDER BY submitted_at DESC
             """;
 
@@ -90,7 +91,7 @@ public class SubmissionRepository {
 
     public Optional<StoredSubmission> findStoredSubmissionById(String submissionId) {
         List<StoredSubmission> submissions = jdbcTemplate.query(
-            "SELECT id, file_path FROM submissions WHERE id = ?",
+            "SELECT id, file_path FROM submissions WHERE id = ? AND deleted = 0",
             STORED_SUBMISSION_ROW_MAPPER,
             submissionId
         );
@@ -98,12 +99,16 @@ public class SubmissionRepository {
     }
 
     public void deleteById(String submissionId) {
-        jdbcTemplate.update("DELETE FROM submissions WHERE id = ?", submissionId);
+        long version = versionCounter.allocate(VersionCounter.TABLE_SUBMISSIONS);
+        jdbcTemplate.update(
+            "UPDATE submissions SET deleted = 1, deleted_at = ?, version = ? WHERE id = ?",
+            System.currentTimeMillis(), version, submissionId);
     }
 
     public Optional<StoredSubmissionDetails> findSubmissionDetailsById(String submissionId) {
         List<StoredSubmissionDetails> submissions = jdbcTemplate.query(
-            "SELECT id, term, course, assignment_id, student_id, file_path, hash, status FROM submissions WHERE id = ?",
+            "SELECT id, term, course, assignment_id, student_id, file_path, hash, status FROM submissions "
+                + "WHERE id = ? AND deleted = 0",
             (resultSet, rowNum) -> new StoredSubmissionDetails(
                 resultSet.getString("id"),
                 resultSet.getString("term"),

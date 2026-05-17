@@ -33,12 +33,90 @@ public final class AssignmentSchemaMigrator implements ApplicationRunner {
 
         if (!columnExists("assignments", "file_name")) {
             transactionTemplate.executeWithoutResult(status -> rebuildLegacyAssignmentsTable());
-            return;
-        }
-
-        if (!columnExists("assignments", "deadline")) {
+        } else if (!columnExists("assignments", "deadline")) {
             jdbcTemplate.execute("ALTER TABLE assignments ADD COLUMN deadline INTEGER");
         }
+
+        addVersioningColumns("assignments");
+        addVersioningColumns("submissions");
+        addVersioningColumns("feedback");
+
+        ensureVersionCounterTable();
+        transactionTemplate.executeWithoutResult(status -> {
+            backfillVersions("assignments", "published_at");
+            backfillVersions("submissions", "submitted_at");
+            backfillVersions("feedback", "returned_at");
+        });
+        ensureVersionIndices();
+    }
+
+    private void ensureVersionIndices() {
+        if (tableExists("assignments")) {
+            jdbcTemplate.execute(
+                "CREATE INDEX IF NOT EXISTS idx_assignments_term_course_version "
+                    + "ON assignments (term, course, version)");
+        }
+        if (tableExists("submissions")) {
+            jdbcTemplate.execute(
+                "CREATE INDEX IF NOT EXISTS idx_submissions_term_course_assignment_version "
+                    + "ON submissions (term, course, assignment_id, version)");
+        }
+        if (tableExists("feedback")) {
+            jdbcTemplate.execute(
+                "CREATE INDEX IF NOT EXISTS idx_feedback_submission_version "
+                    + "ON feedback (submission_id, version)");
+        }
+    }
+
+    private void addVersioningColumns(String tableName) {
+        if (!tableExists(tableName)) {
+            return;
+        }
+        if (!columnExists(tableName, "version")) {
+            jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN version INTEGER NOT NULL DEFAULT 0");
+        }
+        if (!columnExists(tableName, "deleted")) {
+            jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0");
+        }
+        if (!columnExists(tableName, "deleted_at")) {
+            jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN deleted_at INTEGER");
+        }
+    }
+
+    private void ensureVersionCounterTable() {
+        jdbcTemplate.execute("""
+            CREATE TABLE IF NOT EXISTS version_counter (
+                table_name TEXT PRIMARY KEY,
+                next_val INTEGER NOT NULL
+            )
+            """);
+    }
+
+    private void backfillVersions(String tableName, String orderColumn) {
+        if (!tableExists(tableName)) {
+            return;
+        }
+        Integer maxVersion = jdbcTemplate.queryForObject(
+            "SELECT COALESCE(MAX(version), 0) FROM " + tableName, Integer.class);
+        long nextVal = maxVersion == null ? 1L : maxVersion + 1L;
+
+        if (maxVersion == null || maxVersion == 0) {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT rowid AS rid FROM " + tableName + " ORDER BY " + orderColumn + " ASC, rowid ASC");
+            for (Map<String, Object> row : rows) {
+                long version = nextVal++;
+                jdbcTemplate.update(
+                    "UPDATE " + tableName + " SET version = ? WHERE rowid = ?",
+                    version, row.get("rid"));
+            }
+        }
+
+        jdbcTemplate.update(
+            "INSERT INTO version_counter (table_name, next_val) VALUES (?, ?) "
+                + "ON CONFLICT(table_name) DO UPDATE SET next_val = "
+                + "CASE WHEN excluded.next_val > version_counter.next_val THEN excluded.next_val "
+                + "ELSE version_counter.next_val END",
+            tableName, nextVal);
     }
 
     private void rebuildLegacyAssignmentsTable() {
